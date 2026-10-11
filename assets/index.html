@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pippin Cozy Study Desktop</title>
+    
+    <!-- CIRCULAR BROWSER TAB LOGO (FAVICON) -->
+    <link rel="icon" type="image/png" href="assets/pippindawg.png">
+
+    <!-- CUTE & DREAMY GOOGLE FONTS -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="pippin.css">
+</head>
+<body>
+
+    <!-- CINEMATIC SPLASH SCREEN -->
+    <div id="welcome-screen">
+        <div class="welcome-content">
+            <h1 class="welcome-title">Pippin</h1>
+            <p class="welcome-subtitle">Time to Focus & Create</p>
+        </div>
+    </div>
+
+    <!-- TOP-RIGHT HEADER -->
+    <header class="top-right-header">
+        <div class="hub-logo-title">Notes & Tasks Hub</div>
+        <div class="live-datetime-widget" id="live-datetime">Loading date & time...</div>
+    </header>
+
+    <!-- FULL-HEIGHT LEFT SIDEBAR DOCK -->
+    <aside class="left-full-sidebar">
+        <!-- BRANDING (Circle Logo + Name) -->
+        <div class="app-brand-template">
+            <div class="brand-logo-circle">
+                <img src="assets/pippindawg.png" alt="Pippin Logo" class="brand-logo-img">
+            </div>
+            <span class="brand-name">Pippin</span>
+        </div>
+
+        <div class="sidebar-top-section">
+            <div class="taskbar-item-wrapper">
+                <button class="taskbar-tab" onclick="toggleTaskbarTab('notes', event)">Notes & Tasks</button>
+                <div class="taskbar-dropdown-panel" id="panel-notes">
+                    <div class="panel-header">
+                        <button class="back-btn" onclick="closeDropdownPanel()">← Back</button>
+                        <h3>Active Notes & Tasks</h3>
+                    </div>
+                    <div class="items-grid" id="notes-grid"></div>
+                </div>
+            </div>
+
+            <div class="taskbar-item-wrapper">
+                <button class="taskbar-tab" onclick="toggleTaskbarTab('calendar', event)">Calendar</button>
+                <div class="taskbar-dropdown-panel" id="panel-calendar">
+                    <div class="panel-header">
+                        <button class="back-btn" onclick="closeDropdownPanel()">← Back</button>
+                        <h3>October 2026</h3>
+                    </div>
+                    <div class="small-calendar-grid" id="small-cal-grid"></div>
+                </div>
+            </div>
+
+            <div class="taskbar-item-wrapper">
+                <button class="taskbar-tab" onclick="toggleTaskbarTab('reminders', event)">Reminders</button>
+                <div class="taskbar-dropdown-panel" id="panel-reminders">
+                    <div class="panel-header">
+                        <button class="back-btn" onclick="closeDropdownPanel()">← Back</button>
+                        <h3>Reminders</h3>
+                        <button class="pomo-btn" style="font-size:0.75rem; padding:3px 8px;" onclick="openAddReminderModal()">+ New</button>
+                    </div>
+                    <div class="items-grid" id="reminders-grid"></div>
+                </div>
+            </div>
+
+            <div class="taskbar-item-wrapper">
+                <button class="taskbar-tab" onclick="toggleTaskbarTab('archive', event)">Archive</button>
+                <div class="taskbar-dropdown-panel" id="panel-archive">
+                    <div class="panel-header">
+                        <button class="back-btn" onclick="closeDropdownPanel()">← Back</button>
+                        <h3>Archive</h3>
+                    </div>
+                    <div class="items-grid" id="archive-grid"></div>
+                </div>
+            </div>
+
+            <div class="taskbar-item-wrapper">
+                <button class="taskbar-tab" onclick="toggleTaskbarTab('trash', event)">Trash</button>
+                <div class="taskbar-dropdown-panel" id="panel-trash">
+                    <div class="panel-header">
+                        <button class="back-btn" onclick="closeDropdownPanel()">← Back</button>
+                        <h3>Trash</h3>
+                        <button class="pomo-btn" onclick="emptyTrashNow()" style="font-size:0.75rem; padding:3px 8px;">Clear</button>
+                    </div>
+                    <div class="items-grid" id="trash-grid"></div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- MAIN DESKTOP WORKSPACE -->
+    <main class="desktop-workspace">
+        <div class="containerless-timer-section">
+            
+            <!-- INTERACTIVE MASCOT TIMER EMOTION DISPLAY (Tap to cycle dog photo!) -->
+            <div class="timer-mascot-wrapper" onclick="cycleMascotImage()" title="Tap me to change my photo! 🐶">
+                <img id="mascot-img" src="assets/pippinchill.png" alt="Pippin Mascot" class="mascot-img-asset">
+            </div>
+
+            <p class="mode-indicator" id="status-text">Deep Focus Mode</p>
+            <div class="timer-display" id="timer" title="Click to edit time">00:25:00</div>
+
+            <div class="time-input-container" id="input-container">
+                <input type="number" id="input-hours" class="time-input" min="0" max="23" placeholder="HH">
+                <span>:</span>
+                <input type="number" id="input-minutes" class="time-input" min="0" max="59" placeholder="MM">
+                <span>:</span>
+                <input type="number" id="input-seconds" class="time-input" min="0" max="59" placeholder="SS">
+                <button class="save-time-btn" id="save-time-btn">Set</button>
+            </div>
+
+            <div class="controls-grid" id="controls-container">
+                <button class="pomo-btn" id="start-btn">Start</button>
+                <button class="pomo-btn" id="pause-btn">Pause</button>
+                <button class="pomo-btn" id="reset-btn">Reset</button>
+            </div>
+
+            <div class="mode-toggles">
+                <button class="mode-btn active" onclick="setMode(25, 'Deep Focus Mode', this)">Focus (25m)</button>
+                <button class="mode-btn" onclick="setMode(5, 'Short Rest Break', this)">Short Break (5m)</button>
+                <button class="mode-btn" onclick="setMode(15, 'Long Cozy Break', this)">Long Break (15m)</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- CIRCULAR RADIAL FLOATING ACTION MENU -->
+    <div class="radial-fam-wrapper" id="fam-wrapper">
+        <div class="radial-options" id="radial-options">
+            <button class="radial-item" style="--i:1;" onclick="openNoteModal('note')">Note</button>
+            <button class="radial-item" style="--i:2;" onclick="openNoteModal('list')">List</button>
+            <button class="radial-item" style="--i:3;" onclick="openNoteModal('text')">Text</button>
+            <button class="radial-item" style="--i:4;" onclick="openNoteModal('drawing')">Drawing</button>
+            <button class="radial-item" style="--i:5;" onclick="openNoteModal('image')">Image</button>
+        </div>
+        <button class="fam-main-btn" id="fam-main-btn">+</button>
+    </div>
+
+    <!-- CALENDAR DATE EVENT MODAL -->
+    <div class="paper-modal-overlay" id="calendar-date-modal">
+        <div class="paper-writing-pad">
+            <div class="pad-header">
+                <h3 id="cal-date-modal-title">Date Options</h3>
+                <button class="drawer-close" onclick="closeCalendarModal()">&times;</button>
+            </div>
+            <div class="pad-body">
+                <p style="font-size:0.85rem; color:#5c3d2e; margin-bottom:10px;">Write event notes or set a reminder for this date:</p>
+                <input type="text" class="pad-input" id="cal-event-text" placeholder="What's happening on this day?" style="font-weight:bold; margin-bottom:12px;">
+                <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px;">
+                    <label style="font-size:0.85rem; color:#5c3d2e;">
+                        <input type="checkbox" id="cal-pin-checkbox"> Pin to Date
+                    </label>
+                    <label style="font-size:0.85rem; color:#5c3d2e;">
+                        <input type="checkbox" id="cal-reminder-checkbox"> Set as Reminder
+                    </label>
+                </div>
+            </div>
+            <div class="pad-footer-actions">
+                <button class="pad-action-btn save" onclick="saveCalendarEvent()">Save Event</button>
+                <button class="pad-action-btn delete" onclick="closeCalendarModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAPER-STYLE NOTE / LIST / IMAGE / CANVAS MODAL -->
+    <div class="paper-modal-overlay" id="paper-modal">
+        <div class="paper-writing-pad" id="writing-pad-container">
+            <div class="pad-header">
+                <h3 id="modal-title">New Paper Note</h3>
+                <button class="drawer-close" onclick="closeNoteModal()">&times;</button>
+            </div>
+            
+            <div class="pad-body" id="pad-body-content"></div>
+
+            <div class="pad-pin-option" id="pin-option-wrapper">
+                <label>
+                    <input type="checkbox" id="pad-pin-checkbox"> Pin this item
+                </label>
+            </div>
+
+            <div class="pad-footer-actions">
+                <button class="pad-action-btn save" onclick="savePaperNote()">Save</button>
+                <button class="pad-action-btn delete" onclick="discardPaperNote()">Delete</button>
+                <button class="pad-action-btn share" onclick="sharePaperNote()">Share</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="pippin.js"></script>
+</body>
+</html>

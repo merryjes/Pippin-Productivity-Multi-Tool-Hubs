@@ -5,33 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pippin Cozy Study Desktop</title>
     
-    <!-- CIRCULAR BROWSER TAB LOGO (FAVICON) -->
     <link rel="icon" type="image/png" href="assets/pippindawg.png">
-
-    <!-- CUTE & DREAMY GOOGLE FONTS -->
-    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Quicksand:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="pippin.css">
 </head>
-<body>
+<body class="pippin-base-body">
 
-    <!-- CINEMATIC SPLASH SCREEN -->
+    <!-- =======================================================================
+         1. CINEMATIC SPLASH SCREEN (Original Base Feature)
+         ======================================================================= -->
     <div id="welcome-screen">
         <div class="welcome-content">
-            <h1 class="welcome-title">Pippin</h1>
-            <p class="welcome-subtitle">Time to Focus & Create</p>
+            <h1 class="welcome-title">Time to Focus & Create</h1>
+            <p class="welcome-subtitle">Your Cozy Matcha & Chocolate Sanctuary</p>
         </div>
     </div>
 
-    <!-- TOP-RIGHT HEADER -->
+    <!-- =======================================================================
+         2. TOP-RIGHT HEADER (Original Base Feature)
+         ======================================================================= -->
     <header class="top-right-header">
         <div class="hub-logo-title">Notes & Tasks Hub</div>
         <div class="live-datetime-widget" id="live-datetime">Loading date & time...</div>
     </header>
 
-    <!-- FULL-HEIGHT LEFT SIDEBAR DOCK -->
+    <!-- =======================================================================
+         3. FULL-HEIGHT LEFT SIDEBAR DOCK (Original Base Feature)
+         ======================================================================= -->
     <aside class="left-full-sidebar">
-        <!-- BRANDING (Circle Logo + Name) -->
         <div class="app-brand-template">
             <div class="brand-logo-circle">
                 <img src="assets/pippindawg.png" alt="Pippin Logo" class="brand-logo-img">
@@ -40,56 +43,61 @@
         </div>
 
         <div class="sidebar-top-section">
+            <!-- Notes & Tasks Tab -->
             <div class="taskbar-item-wrapper">
                 <button class="taskbar-tab" onclick="toggleTaskbarTab('notes', event)">Notes & Tasks</button>
                 <div class="taskbar-dropdown-panel" id="panel-notes">
                     <div class="panel-header">
-                        <button class="back-btn" onclick="closeDropdownPanel()">← Back</button>
+                        <button class="back-btn" onclick="closeDropdownPanel()">Back</button>
                         <h3>Active Notes & Tasks</h3>
                     </div>
                     <div class="items-grid" id="notes-grid"></div>
                 </div>
             </div>
 
+            <!-- Calendar Tab -->
             <div class="taskbar-item-wrapper">
                 <button class="taskbar-tab" onclick="toggleTaskbarTab('calendar', event)">Calendar</button>
                 <div class="taskbar-dropdown-panel" id="panel-calendar">
                     <div class="panel-header">
-                        <button class="back-btn" onclick="closeDropdownPanel()">← Back</button>
+                        <button class="back-btn" onclick="closeDropdownPanel()">Back</button>
                         <h3>October 2026</h3>
                     </div>
                     <div class="small-calendar-grid" id="small-cal-grid"></div>
                 </div>
             </div>
 
+            <!-- Reminders Tab -->
             <div class="taskbar-item-wrapper">
                 <button class="taskbar-tab" onclick="toggleTaskbarTab('reminders', event)">Reminders</button>
                 <div class="taskbar-dropdown-panel" id="panel-reminders">
                     <div class="panel-header">
-                        <button class="back-btn" onclick="closeDropdownPanel()">← Back</button>
+                        <button class="back-btn" onclick="closeDropdownPanel()">Back</button>
                         <h3>Reminders</h3>
-                        <button class="pomo-btn" style="font-size:0.75rem; padding:3px 8px;" onclick="openAddReminderModal()">+ New</button>
+                        <button class="pomo-btn" style="font-size:0.75rem; padding:3px 8px;" onclick="openAddReminderModal()">New</button>
                     </div>
                     <div class="items-grid" id="reminders-grid"></div>
                 </div>
             </div>
 
+            <!-- Archive Tab -->
             <div class="taskbar-item-wrapper">
                 <button class="taskbar-tab" onclick="toggleTaskbarTab('archive', event)">Archive</button>
                 <div class="taskbar-dropdown-panel" id="panel-archive">
                     <div class="panel-header">
-                        <button class="back-btn" onclick="closeDropdownPanel()">← Back</button>
+                        <button class="back-btn" onclick="closeDropdownPanel()">Back</button>
                         <h3>Archive</h3>
                     </div>
                     <div class="items-grid" id="archive-grid"></div>
                 </div>
             </div>
 
+            <!-- Trash Tab -->
             <div class="taskbar-item-wrapper">
                 <button class="taskbar-tab" onclick="toggleTaskbarTab('trash', event)">Trash</button>
                 <div class="taskbar-dropdown-panel" id="panel-trash">
                     <div class="panel-header">
-                        <button class="back-btn" onclick="closeDropdownPanel()">← Back</button>
+                        <button class="back-btn" onclick="closeDropdownPanel()">Back</button>
                         <h3>Trash</h3>
                         <button class="pomo-btn" onclick="emptyTrashNow()" style="font-size:0.75rem; padding:3px 8px;">Clear</button>
                     </div>
@@ -99,18 +107,19 @@
         </div>
     </aside>
 
-    <!-- MAIN DESKTOP WORKSPACE -->
+    <!-- =======================================================================
+         4. MAIN DESKTOP WORKSPACE (Original Base Feature)
+         ======================================================================= -->
     <main class="desktop-workspace">
         <div class="containerless-timer-section">
-            
-            <!-- INTERACTIVE MASCOT TIMER EMOTION DISPLAY (Tap to cycle dog photo!) -->
-            <div class="timer-mascot-wrapper" onclick="cycleMascotImage()" title="Tap me to change my photo! 🐶">
+            <div class="timer-mascot-wrapper" onclick="cycleMascotImage()" title="Tap to change photo">
                 <img id="mascot-img" src="assets/pippinchill.png" alt="Pippin Mascot" class="mascot-img-asset">
             </div>
 
-            <p class="mode-indicator" id="status-text">Deep Focus Mode</p>
+            <p class="mode-indicator" id="status-text">Pag focus na nimal</p>
             <div class="timer-display" id="timer" title="Click to edit time">00:25:00</div>
 
+            <!-- Base Editable Time Inputs -->
             <div class="time-input-container" id="input-container">
                 <input type="number" id="input-hours" class="time-input" min="0" max="23" placeholder="HH">
                 <span>:</span>
@@ -120,21 +129,31 @@
                 <button class="save-time-btn" id="save-time-btn">Set</button>
             </div>
 
+            <!-- Base Controls -->
             <div class="controls-grid" id="controls-container">
-                <button class="pomo-btn" id="start-btn">Start</button>
-                <button class="pomo-btn" id="pause-btn">Pause</button>
-                <button class="pomo-btn" id="reset-btn">Reset</button>
+                <button class="pomo-btn" id="start-btn" onclick="startTimer()">Start</button>
+                <button class="pomo-btn" id="pause-btn" onclick="pauseTimer()">Pause</button>
+                <button class="pomo-btn" id="reset-btn" onclick="resetTimer()">Reset</button>
             </div>
 
+            <!-- Base Mode Toggles -->
             <div class="mode-toggles">
-                <button class="mode-btn active" onclick="setMode(25, 'Deep Focus Mode', this)">Focus (25m)</button>
+                <button class="mode-btn active" onclick="setMode(25, 'Pag focus na nimal', this)">Focus (25m)</button>
                 <button class="mode-btn" onclick="setMode(5, 'Short Rest Break', this)">Short Break (5m)</button>
                 <button class="mode-btn" onclick="setMode(15, 'Long Cozy Break', this)">Long Break (15m)</button>
+            </div>
+
+            <!-- Launch Floating Companion Options -->
+            <div style="margin-top: 24px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+                <button class="pomo-btn mini-toggle-btn" onclick="toggleMiniMode(true)">🐾 In-Tab Floating Companion</button>
+                <button class="pomo-btn mini-toggle-btn" onclick="toggleDesktopFloat()">📌 Float over other apps (Always-on-Top)</button>
             </div>
         </div>
     </main>
 
-    <!-- CIRCULAR RADIAL FLOATING ACTION MENU -->
+    <!-- =======================================================================
+         5. BASE CIRCULAR RADIAL FLOATING ACTION MENU (Original Bottom-Right FAM)
+         ======================================================================= -->
     <div class="radial-fam-wrapper" id="fam-wrapper">
         <div class="radial-options" id="radial-options">
             <button class="radial-item" style="--i:1;" onclick="openNoteModal('note')">Note</button>
@@ -146,7 +165,9 @@
         <button class="fam-main-btn" id="fam-main-btn">+</button>
     </div>
 
-    <!-- CALENDAR DATE EVENT MODAL -->
+    <!-- =======================================================================
+         6. CALENDAR DATE EVENT MODAL (Original Base Feature)
+         ======================================================================= -->
     <div class="paper-modal-overlay" id="calendar-date-modal">
         <div class="paper-writing-pad">
             <div class="pad-header">
@@ -157,10 +178,10 @@
                 <p style="font-size:0.85rem; color:#5c3d2e; margin-bottom:10px;">Write event notes or set a reminder for this date:</p>
                 <input type="text" class="pad-input" id="cal-event-text" placeholder="What's happening on this day?" style="font-weight:bold; margin-bottom:12px;">
                 <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px;">
-                    <label style="font-size:0.85rem; color:#5c3d2e;">
+                    <label style="font-size:0.85rem; color:#5c3d2e; cursor:pointer;">
                         <input type="checkbox" id="cal-pin-checkbox"> Pin to Date
                     </label>
-                    <label style="font-size:0.85rem; color:#5c3d2e;">
+                    <label style="font-size:0.85rem; color:#5c3d2e; cursor:pointer;">
                         <input type="checkbox" id="cal-reminder-checkbox"> Set as Reminder
                     </label>
                 </div>
@@ -172,7 +193,9 @@
         </div>
     </div>
 
-    <!-- PAPER-STYLE NOTE / LIST / IMAGE / CANVAS MODAL -->
+    <!-- =======================================================================
+         7. PAPER-STYLE NOTE MODAL (Original Base Feature)
+         ======================================================================= -->
     <div class="paper-modal-overlay" id="paper-modal">
         <div class="paper-writing-pad" id="writing-pad-container">
             <div class="pad-header">
@@ -183,7 +206,7 @@
             <div class="pad-body" id="pad-body-content"></div>
 
             <div class="pad-pin-option" id="pin-option-wrapper">
-                <label>
+                <label style="cursor:pointer;">
                     <input type="checkbox" id="pad-pin-checkbox"> Pin this item
                 </label>
             </div>
@@ -195,6 +218,276 @@
             </div>
         </div>
     </div>
+
+    <!-- =======================================================================
+         8. ENHANCED FLOATING DESKTOP STUDY COMPANION WIDGET
+            (Interactive Floating Feature: Draggable, Resizable, Lockable,
+             Scalable Timer & Mascot, MultiHub Radial Menu, Notes, Lists,
+             Drawing, Calculator with C/DEL/History, Shortcut Viewer)
+         ======================================================================= -->
+    <aside id="pippin-floating-companion" class="floating-companion mode-unlocked size-medium" role="region" aria-label="Pippin Study Companion">
+
+        <!-- 8-DIRECTION RESIZE HANDLES -->
+        <div class="resize-handle rh-n" data-dir="n"></div>
+        <div class="resize-handle rh-e" data-dir="e"></div>
+        <div class="resize-handle rh-s" data-dir="s"></div>
+        <div class="resize-handle rh-w" data-dir="w"></div>
+        <div class="resize-handle rh-nw" data-dir="nw"></div>
+        <div class="resize-handle rh-ne" data-dir="ne"></div>
+        <div class="resize-handle rh-sw" data-dir="sw"></div>
+        <div class="resize-handle rh-se" data-dir="se"></div>
+
+        <!-- COMPANION TOP DRAG HANDLE & MINIMAL HEADER -->
+        <div class="companion-drag-handle" id="companion-drag-handle">
+            <div class="topbar-left">
+                <span class="drag-dots" title="Drag widget">⋮⋮</span>
+                <span class="companion-title-tag">Pippin</span>
+            </div>
+
+            <div class="companion-header-actions">
+                <!-- Minimal Lock / Unlock Icon Toggle -->
+                <button type="button" class="companion-icon-btn" id="companion-lock-btn" onclick="toggleCompanionLock()" title="Lock / Unlock Position">
+                    <span id="lock-icon">🔓</span>
+                </button>
+
+                <!-- Float Over External Apps / Desktop (Document Picture-in-Picture) -->
+                <button type="button" class="companion-icon-btn pip-glow-btn" id="companion-pip-btn" onclick="toggleDesktopFloat()" title="Float on Desktop (Always-on-Top over other apps/tabs)">
+                    📌
+                </button>
+
+                <!-- Close / Dock Back to Base Workspace -->
+                <button type="button" class="companion-icon-btn close-companion-btn" onclick="toggleMiniMode(false)" title="Close Companion (Dock to Dashboard)">
+                    ✕
+                </button>
+            </div>
+        </div>
+
+        <!-- CORE SECTION: EMPHASIZED BIG TIMER & MASCOT WITH LITTLE BUTTONS -->
+        <div class="companion-body">
+            <!-- Scalable Mascot Avatar -->
+            <div class="companion-mascot-wrapper" onclick="cycleMascotImage()" title="Tap to switch Pippin's mood">
+                <img id="companion-mascot-img" src="assets/pippinchill.png" alt="Pippin Mascot" class="companion-mascot-img">
+            </div>
+
+            <!-- Prominent Big Timer Display -->
+            <div class="companion-timer-info">
+                <span class="companion-mode-text" id="companion-mode-text">Pag focus na nimal</span>
+                
+                <!-- Large Bold Editable Timer -->
+                <div class="companion-timer-display" id="companion-timer-display" onclick="enableFloatingTimeEdit()" title="Click to edit time (HH:MM:SS)">
+                    00:25:00
+                </div>
+
+                <!-- Clean Inline Time Edit Inputs -->
+                <div class="companion-time-edit-box" id="companion-time-edit-box">
+                    <input type="number" id="floating-input-h" min="0" max="99" placeholder="HH">
+                    <span>:</span>
+                    <input type="number" id="floating-input-m" min="0" max="59" placeholder="MM">
+                    <span>:</span>
+                    <input type="number" id="floating-input-s" min="0" max="59" placeholder="SS">
+                    <button type="button" class="btn-time-save" onclick="saveFloatingTimeEdit()">Set</button>
+                    <button type="button" class="btn-time-cancel" onclick="cancelFloatingTimeEdit()">✕</button>
+                </div>
+            </div>
+
+            <!-- Minimal Controls Cluster (Little Buttons - No Overcrowding) -->
+            <div class="companion-controls-cluster">
+                <div class="companion-controls">
+                    <!-- Play / Pause Toggle Button -->
+                    <button type="button" class="companion-control-btn btn-ctrl-play" id="companion-play-toggle-btn" onclick="toggleTimerRunning()" title="Start / Pause">
+                        <span id="companion-play-icon" class="ctrl-icon">▶</span>
+                    </button>
+                    <!-- Reset Button -->
+                    <button type="button" class="companion-control-btn btn-ctrl-restart" id="companion-restart-btn" onclick="restartTimer()" title="Restart Session">
+                        <span class="ctrl-icon">↺</span>
+                    </button>
+                </div>
+
+                <!-- MultiHub Button (+) positioned neatly beside controls, NO OVERLAP -->
+                <div class="companion-multihub-wrapper" id="companion-multihub-wrapper">
+                    <nav class="companion-radial-menu" id="companion-radial-menu" aria-label="Tools Radial Menu">
+                        <button type="button" class="companion-radial-btn r-notes" style="--angle: -80deg; --dist: 95px;" onclick="openFloatingTool('notes')">
+                            <span class="radial-label">Notes</span>
+                        </button>
+                        <button type="button" class="companion-radial-btn r-lists" style="--angle: -35deg; --dist: 105px;" onclick="openFloatingTool('lists')">
+                            <span class="radial-label">Lists</span>
+                        </button>
+                        <button type="button" class="companion-radial-btn r-drawing" style="--angle: 15deg; --dist: 110px;" onclick="openFloatingTool('drawing')">
+                            <span class="radial-label">Drawing</span>
+                        </button>
+                        <button type="button" class="companion-radial-btn r-calculator" style="--angle: 65deg; --dist: 105px;" onclick="openFloatingTool('calculator')">
+                            <span class="radial-label">Calculator</span>
+                        </button>
+                        <button type="button" class="companion-radial-btn r-shortcuts" style="--angle: 115deg; --dist: 95px;" onclick="openFloatingTool('shortcuts')">
+                            <span class="radial-label">Shortcuts</span>
+                        </button>
+                    </nav>
+
+                    <!-- Center MultiHub Plus (+) Button -->
+                    <button type="button" class="companion-multihub-fab" id="companion-multihub-fab" onclick="toggleFloatingMultiHub()" title="Tools MultiHub (+)">
+                        +
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TOOL PANELS SECTION (Expands while KEEPING the timer visible at all times) -->
+        <div class="floating-sub-window" id="floating-sub-window">
+            <div class="sub-window-header">
+                <span id="sub-window-title">Tool Workspace</span>
+                <button type="button" class="drawer-close" onclick="closeFloatingSubWindow()">&times;</button>
+            </div>
+            
+            <div class="sub-window-content" id="sub-window-content">
+                <!-- 1. NOTES TOOL -->
+                <div class="f-tool-view" id="ftool-notes" style="display:none;">
+                    <div class="notes-subnav">
+                        <button type="button" class="btn-subnav active" id="btn-fnotes-write" onclick="switchFloatingNotesTab('write')">+ New Note</button>
+                        <button type="button" class="btn-subnav" id="btn-fnotes-list" onclick="switchFloatingNotesTab('list')">Saved (<span id="fnotes-count">0</span>)</button>
+                    </div>
+                    <div id="fnotes-write-box">
+                        <input type="text" class="pad-input" id="float-note-title" placeholder="Note title..." style="font-weight:bold; margin-bottom:6px;">
+                        <textarea class="pad-textarea" id="float-note-body" placeholder="Write study notes here..." style="min-height:90px;"></textarea>
+                        <div class="tool-actions-bar">
+                            <button type="button" class="pad-action-btn save" onclick="saveFloatingNote()">Save</button>
+                            <button type="button" class="pad-action-btn delete" onclick="discardFloatingNote()">Discard</button>
+                        </div>
+                    </div>
+                    <div id="fnotes-list-box" style="display:none; max-height:160px; overflow-y:auto;" class="saved-cards-grid"></div>
+                </div>
+
+                <!-- 2. LISTS TOOL (Bullet & Numbered) -->
+                <div class="f-tool-view" id="ftool-lists" style="display:none;">
+                    <div class="lists-top-bar" style="margin-bottom:6px;">
+                        <div class="list-style-toggle">
+                            <button type="button" class="style-toggle-btn active" id="btn-flist-bullet" onclick="setFloatingListStyle('bullet')">• Bullet</button>
+                            <button type="button" class="style-toggle-btn" id="btn-flist-numbered" onclick="setFloatingListStyle('numbered')">1. Numbered</button>
+                        </div>
+                        <button type="button" class="btn-subnav" onclick="showFloatingSavedLists()">Saved (<span id="flists-count">0</span>)</button>
+                    </div>
+                    <input type="text" class="pad-input" id="float-list-title" placeholder="List title (e.g. Study, Homework, Review)..." style="font-weight:bold; margin-bottom:6px;">
+                    <div class="list-items-container" id="float-list-items-box" style="max-height:110px; overflow-y:auto;"></div>
+                    <div class="list-add-row" style="margin-top:6px;">
+                        <input type="text" id="float-new-item-input" class="cozy-input" placeholder="Add item and press Enter..." onkeydown="handleFloatingListEnter(event)">
+                        <button type="button" class="btn-add-item" onclick="addFloatingListItem()">+ Add</button>
+                    </div>
+                    <div class="tool-actions-bar">
+                        <button type="button" class="pad-action-btn save" onclick="saveFloatingList()">Save</button>
+                        <button type="button" class="pad-action-btn delete" onclick="discardFloatingList()">Discard</button>
+                    </div>
+                    <div id="flists-drawer" style="display:none; margin-top:8px;" class="saved-cards-grid"></div>
+                </div>
+
+                <!-- 3. DRAWING TOOL (Pencil, Eraser, Clear, Save, Discard) -->
+                <div class="f-tool-view" id="ftool-drawing" style="display:none;">
+                    <div class="canvas-toolbar" style="margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
+                        <div style="display:flex; gap:4px;">
+                            <button type="button" class="canvas-tool-btn active" id="ftool-marker" onclick="setFloatingCanvasTool('marker')">✏️ Pencil</button>
+                            <button type="button" class="canvas-tool-btn" id="ftool-eraser" onclick="setFloatingCanvasTool('eraser')">🧹 Eraser</button>
+                        </div>
+                        <div style="display:flex; gap:8px; align-items:center; font-size:0.75rem;">
+                            <input type="color" id="fdraw-color" value="#4a2c1d" style="width:20px; height:20px; border:none; border-radius:50%;" onchange="setFloatingDrawColor(this.value)">
+                            <button type="button" class="canvas-tool-btn" onclick="clearFloatingCanvas()">Clear</button>
+                        </div>
+                    </div>
+                    <canvas id="float-drawing-canvas" width="360" height="150" class="drawing-canvas"></canvas>
+                    <div class="tool-actions-bar">
+                        <button type="button" class="pad-action-btn save" onclick="saveFloatingDrawing()">Save</button>
+                        <button type="button" class="pad-action-btn delete" onclick="discardFloatingDrawing()">Discard</button>
+                        <button type="button" class="btn-subnav" onclick="toggleFloatingDrawingGallery()">Gallery (<span id="fdrawings-count">0</span>)</button>
+                    </div>
+                    <div id="fdrawings-gallery" style="display:none; max-height:120px; overflow-y:auto; margin-top:6px;" class="saved-cards-grid"></div>
+                </div>
+
+                <!-- 4. CALCULATOR TOOL (C, DEL single char, Operations, History) -->
+                <div class="f-tool-view" id="ftool-calculator" style="display:none;">
+                    <div class="calc-grid-layout">
+                        <div class="calc-main-pad">
+                            <div class="calc-screen">
+                                <div class="calc-formula" id="fcalc-formula">&nbsp;</div>
+                                <div class="calc-value" id="fcalc-display">0</div>
+                            </div>
+                            <div class="calc-keys">
+                                <button type="button" class="calc-btn btn-clear" onclick="fcalcClear()">C</button>
+                                <button type="button" class="calc-btn btn-del" onclick="fcalcDelete()">DEL</button>
+                                <button type="button" class="calc-btn btn-op" onclick="fcalcOp('/')">÷</button>
+                                <button type="button" class="calc-btn btn-op" onclick="fcalcOp('*')">×</button>
+
+                                <button type="button" class="calc-btn btn-num" onclick="fcalcNum('7')">7</button>
+                                <button type="button" class="calc-btn btn-num" onclick="fcalcNum('8')">8</button>
+                                <button type="button" class="calc-btn btn-num" onclick="fcalcNum('9')">9</button>
+                                <button type="button" class="calc-btn btn-op" onclick="fcalcOp('-')">-</button>
+
+                                <button type="button" class="calc-btn btn-num" onclick="fcalcNum('4')">4</button>
+                                <button type="button" class="calc-btn btn-num" onclick="fcalcNum('5')">5</button>
+                                <button type="button" class="calc-btn btn-num" onclick="fcalcNum('6')">6</button>
+                                <button type="button" class="calc-btn btn-op" onclick="fcalcOp('+')">+</button>
+
+                                <button type="button" class="calc-btn btn-num" onclick="fcalcNum('1')">1</button>
+                                <button type="button" class="calc-btn btn-num" onclick="fcalcNum('2')">2</button>
+                                <button type="button" class="calc-btn btn-num" onclick="fcalcNum('3')">3</button>
+                                <button type="button" class="calc-btn btn-equals" onclick="fcalcEqual()">=</button>
+
+                                <button type="button" class="calc-btn btn-num zero-btn" onclick="fcalcNum('0')">0</button>
+                                <button type="button" class="calc-btn btn-num" onclick="fcalcDecimal()">.</button>
+                            </div>
+                        </div>
+
+                        <!-- Calculation History -->
+                        <div class="calc-history-box">
+                            <div class="history-header">
+                                <h3>History</h3>
+                                <div class="history-actions-row">
+                                    <button type="button" class="btn-hist-small" onclick="saveCalculationHistory()">Save</button>
+                                    <button type="button" class="btn-hist-small" onclick="clearCalculationHistory()">Clear</button>
+                                    <button type="button" class="btn-hist-small" onclick="discardCalculationHistory()">Discard</button>
+                                </div>
+                            </div>
+                            <div class="calc-history-list" id="fcalc-history-list"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. SHORTCUTS VIEWER TOOL -->
+                <div class="f-tool-view" id="ftool-shortcuts" style="display:none;">
+                    <div class="shortcuts-guide-wrapper">
+                        <p class="shortcuts-intro">Keyboard Shortcuts:</p>
+                        <div class="shortcuts-table">
+                            <div class="shortcut-row">
+                                <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>N</kbd></span>
+                                <span class="shortcut-desc">Open <strong>Notes</strong></span>
+                            </div>
+                            <div class="shortcut-row">
+                                <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>L</kbd></span>
+                                <span class="shortcut-desc">Open <strong>Lists</strong></span>
+                            </div>
+                            <div class="shortcut-row">
+                                <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>D</kbd></span>
+                                <span class="shortcut-desc">Open <strong>Drawing</strong></span>
+                            </div>
+                            <div class="shortcut-row">
+                                <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>K</kbd></span>
+                                <span class="shortcut-desc">Open <strong>Calculator</strong></span>
+                            </div>
+                            <div class="shortcut-row">
+                                <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>M</kbd></span>
+                                <span class="shortcut-desc">Toggle <strong>MultiHub</strong> (+)</span>
+                            </div>
+                            <div class="shortcut-row">
+                                <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>T</kbd></span>
+                                <span class="shortcut-desc">Edit <strong>Timer Settings</strong></span>
+                            </div>
+                            <div class="shortcut-row">
+                                <span class="shortcut-keys"><kbd>Space</kbd></span>
+                                <span class="shortcut-desc"><strong>Start / Pause</strong> Timer</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </aside>
 
     <script src="pippin.js"></script>
 </body>

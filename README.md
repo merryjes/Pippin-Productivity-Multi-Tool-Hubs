@@ -1,1 +1,5 @@
-I built Pippin because I've always struggled to stay focused, and standard timer apps just felt too cold, rigid, and boring to keep me on track. I wanted a comforting digital space that felt like a gentle study desk rather than a strict clock, so I created Pippin—a warm, matcha-and-chocolate sanctuary named after my dog. It brings together a pomodoro timer with cute mascot mood expressions, quick paper notes, to-do lists, a mini calendar, and even a drawing canvas, giving easily distracted minds like mine everything needed to stay in flow without juggling a dozen different apps.
+Pippin Cozy Study Desktop
+
+Pippin is a cozy study companion made with HTML, CSS, and JavaScript. It combines a Pomodoro timer, notes, reminders, drawing tools, calculator, and a floating assistant into a single workspace designed for studying and productivity. The project uses a warm matcha-and-chocolate inspired design to create a comfortable and motivating environment while working.
+
+The project is still a work in progress, and some features such as the floating companion and external floating mode are currently being improved. New updates will focus on making the floating widget more interactive, responsive

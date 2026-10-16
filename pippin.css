@@ -175,9 +175,7 @@ body.pippin-base-body::before { content:''; position:absolute; inset:0;
 .pad-action-btn.delete { background:#e07a5f; color:#fff; }
 .pad-action-btn.share { background:#f4e285; color:var(--cocoa-dark); }
 
-/* ==========================================================================
-   FLOATING COMPANION
-   ========================================================================== */
+ 
 /* ==========================================================================
    FLOATING COMPANION WIDGET
    ========================================================================== */
@@ -352,3 +350,69 @@ body.in-pip-mode .floating-companion { position:static !important; display:flex 
 body.in-pip-mode .floating-companion.hub-open { overflow:visible !important; }
 body.in-pip-mode .resize-handle { display:none !important; }
 body.in-pip-mode .floating-sub-window { max-height:60vh; }
+
+
+/* ==========================================================================
+   CALCULATOR — floating tool + paper modal (matcha & chocolate)
+   ========================================================================== */
+.calc-screen { background:#fff; border:2px solid var(--surface-border); border-radius:14px;
+    padding:8px 12px; text-align:right; margin-bottom:8px; min-width:0; }
+.calc-formula { font-size:0.7rem; color:var(--card-text); font-weight:600; min-height:1em;
+    overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.calc-value { font-family:'Fredoka',sans-serif; font-size:1.5rem; font-weight:700;
+    color:var(--cocoa-dark); line-height:1.2; overflow:hidden; white-space:nowrap;
+    text-overflow:ellipsis; }
+
+/* Keypad: compact 4-column grid */
+.calc-keys { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+.calc-btn { border:1.5px solid var(--surface-border); border-radius:12px; background:#fff;
+    color:var(--cocoa-dark); font-size:0.9rem; font-weight:700; cursor:pointer;
+    padding:8px 0; text-align:center; transition:all 0.15s ease; user-select:none; }
+.calc-btn:active { transform:scale(0.94); }
+.calc-btn:hover { background:var(--matcha-light); border-color:var(--matcha-green); }
+.calc-btn.btn-num { background:#fffdfa; }
+.calc-btn.btn-op { background:var(--matcha-light); color:var(--matcha-dark); border-color:var(--matcha-green); }
+.calc-btn.btn-clear { background:#fdecea; color:var(--danger-red); border-color:#f5c6c2; }
+.calc-btn.btn-del { background:#faf0e6; color:var(--cocoa-light); }
+.calc-btn.btn-equals { background:var(--cocoa-dark); color:#fff; border-color:var(--cocoa-dark); }
+.calc-btn.btn-equals:hover { background:var(--matcha-green); border-color:var(--matcha-green); }
+.calc-btn.zero-btn { grid-column:span 2; }
+
+/* History */
+.calc-history-box { border-top:1px dashed var(--surface-border); margin-top:10px; padding-top:6px; }
+.calc-history-box .history-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+.calc-history-box .history-header h3 { font-family:'Fredoka',sans-serif; font-size:0.8rem;
+    color:var(--cocoa-dark); }
+.history-actions-row { display:flex; gap:6px; }
+.btn-hist-small { background:transparent; border:1px solid var(--surface-border); border-radius:8px;
+    color:var(--card-text); font-size:0.62rem; font-weight:700; cursor:pointer; padding:2px 8px; }
+.btn-hist-small:hover { background:var(--butter-yellow); color:var(--cocoa-dark); }
+.calc-history-list { display:flex; flex-direction:column; gap:4px; max-height:110px; overflow-y:auto; }
+.history-item-row { display:flex; justify-content:space-between; align-items:center; gap:8px;
+    background:var(--matcha-light); border-radius:10px; padding:4px 10px;
+    font-size:0.72rem; color:var(--card-text); }
+.history-item-row strong { color:var(--cocoa-dark); }
+.btn-del-hist { background:transparent; border:none; color:var(--danger-red); cursor:pointer;
+    font-size:0.8rem; padding:0 2px; line-height:1; }
+.btn-del-hist:hover { transform:scale(1.2); }
+
+/* ==========================================================================
+   SHORTCUTS VIEW (floating "Keys" tool)
+   ========================================================================== */
+.shortcuts-table { display:flex; flex-direction:column; gap:6px; }
+.shortcut-row { display:flex; justify-content:space-between; align-items:center; gap:10px;
+    background:#fffdfa; border:1px solid var(--surface-border); border-radius:12px;
+    padding:6px 12px; font-size:0.78rem; color:var(--card-text); }
+.shortcut-keys { display:flex; align-items:center; gap:3px; flex-shrink:0; }
+.shortcut-keys kbd { background:var(--matcha-light); border:1px solid var(--matcha-green);
+    border-radius:6px; padding:2px 7px; font-family:'JetBrains Mono',monospace;
+    font-size:0.68rem; font-weight:700; color:var(--matcha-dark); box-shadow:0 2px 0 var(--matcha-green); }
+.shortcut-desc { font-weight:700; }
+
+/* ==========================================================================
+   MISSING KEYFRAME (referenced by .timer-display.timer-urgent)
+   ========================================================================== */
+@keyframes timer-pulse {
+    0%, 100% { opacity:1; }
+    50% { opacity:0.55; }
+}

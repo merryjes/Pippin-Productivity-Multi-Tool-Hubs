@@ -1,101 +1,80 @@
 /**
  * PIPPIN COZY STUDY DESKTOP
- * Complete Base Workspace + Enhanced Floating Companion Engine
+ * Workspace + Floating Companion Engine
+ * KEY FIX: deadline-based timer (drift-free, survives background-tab throttling)
  */
 
 // =============================================================================
-// GLOBAL SHARED STATE
+// GLOBAL STATE
 // =============================================================================
 let appItems = JSON.parse(localStorage.getItem('pippin_items')) || [
     { id: 1, type: 'note', title: 'Welcome Note', body: 'Explore your cozy matcha & chocolate sanctuary!', isPinned: true, timestamp: Date.now(), folder: 'notes' }
 ];
-
 let calendarEvents = JSON.parse(localStorage.getItem('pippin_cal_events')) || {};
 
-// Timer State
-let totalSeconds = 25 * 60;
-let initialSeconds = 25 * 60;
+let totalSeconds = 25 * 60;      // remaining seconds (single source of truth)
+let initialSeconds = 25 * 60;    // what Reset restores
 let timerInterval = null;
+let timerDeadline = null;        // Date.now()-based -> no drift, no tab-throttle stall
 let isRunning = false;
 
-// Mascot Assets & Emotion State
-const mascotAssets = [
-    'assets/pippinchill.png',
-    'assets/pippinnerd.png',
-    'assets/pippinsad.png',
-    'assets/pippindawg.png'
-];
+const mascotAssets = ['assets/pippinchill.png', 'assets/pippinnerd.png', 'assets/pippinsad.png', 'assets/pippindawg.png'];
 let currentMascotIndex = 0;
 
-// Floating Companion State
 let companionState = {
-    isMiniMode: false,
-    isLocked: false,
-    currentPreset: 'medium',
-    activeTool: null, // 'notes' | 'lists' | 'drawing' | 'calculator' | 'shortcuts' | null
-    isMultiHubOpen: false,
-    isPipActive: false,
-    pipWindow: null,
-    // Calculator inside companion
-    calcExpression: '0',
-    calcFormula: '',
+    isLocked: false, activeTool: null, isMultiHubOpen: false,
+    isPipActive: false, pipWindow: null, isInTabFallback: false,
+    floatImageData: null,
+    calcExpression: '0', calcFormula: '',
     calcHistory: JSON.parse(localStorage.getItem('pippin_calc_history')) || [],
-    // Lists inside companion
-    listStyle: 'bullet', // 'bullet' | 'numbered'
-    currentListItems: [],
-    savedLists: JSON.parse(localStorage.getItem('pippin_saved_lists')) || [],
-    // Drawing inside companion
-    drawTool: 'marker',
-    drawColor: '#4a2c1d',
-    isDrawing: false,
-    savedDrawings: JSON.parse(localStorage.getItem('pippin_drawings')) || []
+    currentListItems: [], listStyle: 'bullet',
+    drawColor: '#4a2c1d', isDrawing: false
 };
 
 // =============================================================================
-// DOM CONTENT LOADED - INITIALIZE BOTH WORKSPACES
+// CROSS-DOCUMENT HELPERS (widget lives in the PiP document while floating)
+// =============================================================================
+function getDoc() {
+    return (companionState.isPipActive && companionState.pipWindow)
+        ? companionState.pipWindow.document : document;
+}
+function getEl(id) { return getDoc().getElementById(id); }
+function companionRoot() { return getEl('pippin-floating-companion'); }
+
+// =============================================================================
+// INIT
 // =============================================================================
 window.addEventListener('DOMContentLoaded', () => {
     initSplashScreen();
     updateLiveDateTime();
     setInterval(updateLiveDateTime, 1000);
-
     generateSmallCalendar();
     renderAllHubs();
     checkTrashExpiry();
-
-    // Initialize Floating Companion Interactions
     initCompanionDragging();
     initCompanion8WayResizing();
     initCompanionCanvas();
+    initCompanionIdleFade();
     initGlobalShortcuts();
-
     updateAllTimerDisplays();
-    renderCalcHistoryUI();
-    renderFloatingListsUI();
-    renderFloatingDrawingsGalleryUI();
+    updatePlayButtonUI();
 });
 
 function saveToLocalStorage() {
     localStorage.setItem('pippin_items', JSON.stringify(appItems));
     localStorage.setItem('pippin_cal_events', JSON.stringify(calendarEvents));
     localStorage.setItem('pippin_calc_history', JSON.stringify(companionState.calcHistory));
-    localStorage.setItem('pippin_saved_lists', JSON.stringify(companionState.savedLists));
-    localStorage.setItem('pippin_drawings', JSON.stringify(companionState.savedDrawings));
     renderAllHubs();
     generateSmallCalendar();
 }
 
 // =============================================================================
-// 1. CINEMATIC SPLASH SCREEN & LIVE DATE/TIME WIDGET (Base Features)
+// 1. SPLASH & CLOCK (base + widget)
 // =============================================================================
 function initSplashScreen() {
     const welcomeScreen = document.getElementById('welcome-screen');
     const welcomeContent = document.querySelector('.welcome-content');
-    
-    setTimeout(() => {
-        if (welcomeContent) welcomeContent.classList.add('text-in');
-    }, 300);
-
+    setTimeout(() => { if (welcomeContent) welcomeContent.classList.add('text-in'); }, 300);
     setTimeout(() => {
         if (welcomeContent) welcomeContent.classList.add('text-out');
         if (welcomeScreen) welcomeScreen.classList.add('fade-out-bg');
@@ -104,38 +83,36 @@ function initSplashScreen() {
 
 function updateLiveDateTime() {
     const now = new Date();
-    const optionsDate = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    const dateStr = now.toLocaleDateString('en-US', optionsDate);
-    const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
     const dtWidget = document.getElementById('live-datetime');
     if (dtWidget) dtWidget.textContent = `${dateStr} | ${timeStr}`;
+    const fDate = getEl('floating-live-date');
+    if (fDate) fDate.textContent = `${dateStr} | ${timeStr}`;
 }
 
 // =============================================================================
-// 2. FULL-HEIGHT LEFT SIDEBAR DOCK (Base Features)
+// 2. SIDEBAR
 // =============================================================================
-window.toggleTaskbarTab = function(tabName, event) {
+window.toggleTaskbarTab = function (tabName, event) {
     const panels = document.querySelectorAll('.taskbar-dropdown-panel');
     const tabs = document.querySelectorAll('.taskbar-tab');
     const targetPanel = document.getElementById(`panel-${tabName}`);
     const isAlreadyOpen = targetPanel ? targetPanel.classList.contains('open') : false;
-
     panels.forEach(p => p.classList.remove('open'));
     tabs.forEach(t => t.classList.remove('active'));
-
     if (!isAlreadyOpen && targetPanel) {
         targetPanel.classList.add('open');
         if (event && event.currentTarget) event.currentTarget.classList.add('active');
     }
 };
-
-window.closeDropdownPanel = function() {
+window.closeDropdownPanel = function () {
     document.querySelectorAll('.taskbar-dropdown-panel').forEach(p => p.classList.remove('open'));
     document.querySelectorAll('.taskbar-tab').forEach(t => t.classList.remove('active'));
 };
 
 // =============================================================================
-// 3. CALENDAR & REMINDERS (Base Features)
+// 3. CALENDAR & REMINDERS
 // =============================================================================
 let selectedCalDateDay = null;
 
@@ -156,38 +133,27 @@ function openCalendarDateModal(day) {
     selectedCalDateDay = day;
     const modal = document.getElementById('calendar-date-modal');
     document.getElementById('cal-date-modal-title').textContent = `October ${day}, 2026`;
-    
     const existing = calendarEvents[day];
     document.getElementById('cal-event-text').value = existing ? existing.text : '';
     document.getElementById('cal-pin-checkbox').checked = existing ? existing.isPinned : false;
     document.getElementById('cal-reminder-checkbox').checked = false;
-
     if (modal) modal.classList.add('open');
 }
 
-window.closeCalendarModal = function() {
+window.closeCalendarModal = function () {
     const modal = document.getElementById('calendar-date-modal');
     if (modal) modal.classList.remove('open');
 };
 
-window.saveCalendarEvent = function() {
+window.saveCalendarEvent = function () {
     const text = document.getElementById('cal-event-text').value.trim();
     const isPinned = document.getElementById('cal-pin-checkbox').checked;
     const isReminder = document.getElementById('cal-reminder-checkbox').checked;
-
     if (text) {
         calendarEvents[selectedCalDateDay] = { text: text, isPinned: isPinned };
-
         if (isReminder) {
-            appItems.push({
-                id: Date.now(),
-                type: 'reminder',
-                title: `Oct ${selectedCalDateDay} Reminder`,
-                body: text,
-                isPinned: isPinned,
-                timestamp: Date.now(),
-                folder: 'reminders'
-            });
+            appItems.push({ id: Date.now(), type: 'reminder', title: `Oct ${selectedCalDateDay} Reminder`,
+                body: text, isPinned: isPinned, timestamp: Date.now(), folder: 'reminders' });
         }
         saveToLocalStorage();
     } else {
@@ -197,37 +163,32 @@ window.saveCalendarEvent = function() {
     closeCalendarModal();
 };
 
-window.openAddReminderModal = function() {
-    openNoteModal('reminder');
-};
+window.openAddReminderModal = function () { openNoteModal('reminder'); };
 
 // =============================================================================
-// 4. STORAGE & HUB VIEWER (Notes, Tasks, Archive, Trash)
+// 4. STORAGE & HUBS
 // =============================================================================
 function renderAllHubs() {
     const notesGrid = document.getElementById('notes-grid');
     const remindersGrid = document.getElementById('reminders-grid');
     const archiveGrid = document.getElementById('archive-grid');
     const trashGrid = document.getElementById('trash-grid');
-
     if (notesGrid) notesGrid.innerHTML = '';
     if (remindersGrid) remindersGrid.innerHTML = '';
     if (archiveGrid) archiveGrid.innerHTML = '';
     if (trashGrid) trashGrid.innerHTML = '';
 
-    appItems.sort((a, b) => b.isPinned - a.isPinned);
+appItems.sort((a, b) => b.isPinned - a.isPinned);
 
-    appItems.forEach(item => {
+appItems.forEach(item => {
         const card = document.createElement('div');
         card.className = `workspace-card ${item.isPinned ? 'pinned' : ''}`;
-        
-        let contentDisplay = item.body;
+        let contentDisplay = escapeHtml(item.body);
         if (item.type === 'image' && item.imageData) {
-            contentDisplay = `<img src="${item.imageData}" style="max-width:100%; border-radius:8px; margin-bottom:6px;"><br>${item.body}`;
+            contentDisplay = `<img src="${item.imageData}" style="max-width:100%; border-radius:8px; margin-bottom:6px;"><br>${escapeHtml(item.body)}`;
         } else if (item.type === 'drawing' && item.drawingData) {
-            contentDisplay = `<img src="${item.drawingData}" style="max-width:100%; border-radius:8px; background:#fff; margin-bottom:6px;"><br>${item.body}`;
+            contentDisplay = `<img src="${item.drawingData}" style="max-width:100%; border-radius:8px; background:#fff; margin-bottom:6px;"><br>${escapeHtml(item.body)}`;
         }
-
         card.innerHTML = `
             <div style="flex:1;">
                 <div class="card-title-text">${escapeHtml(item.title || 'Untitled')}</div>
@@ -240,63 +201,41 @@ function renderAllHubs() {
                 ` : `<button class="pomo-btn" style="font-size:0.65rem; padding:2px 8px;" onclick="restoreItem(${item.id})">Restore</button>`}
             </div>
         `;
-
         if (item.folder === 'notes' && notesGrid) notesGrid.appendChild(card);
         else if (item.folder === 'reminders' && remindersGrid) remindersGrid.appendChild(card);
         else if (item.folder === 'archive' && archiveGrid) archiveGrid.appendChild(card);
         else if (item.folder === 'trash' && trashGrid) trashGrid.appendChild(card);
     });
-
-    // Update count in floating notes drawer
-    const fnotesCount = document.getElementById('fnotes-count');
-    if (fnotesCount) {
-        fnotesCount.textContent = appItems.filter(i => i.folder === 'notes').length;
-    }
 }
 
-window.moveToFolder = function(id, targetFolder) {
+window.moveToFolder = function (id, targetFolder) {
     const item = appItems.find(i => i.id === id);
-    if (item) {
-        item.folder = targetFolder;
-        if (targetFolder === 'trash') item.deletedAt = Date.now();
-        saveToLocalStorage();
-    }
+    if (item) { item.folder = targetFolder; if (targetFolder === 'trash') item.deletedAt = Date.now(); saveToLocalStorage(); }
 };
-
-window.restoreItem = function(id) {
+window.restoreItem = function (id) {
     const item = appItems.find(i => i.id === id);
-    if (item) {
-        item.folder = 'notes';
-        delete item.deletedAt;
-        saveToLocalStorage();
-    }
+    if (item) { item.folder = 'notes'; delete item.deletedAt; saveToLocalStorage(); }
 };
-
 function checkTrashExpiry() {
     const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
     const now = Date.now();
     appItems = appItems.filter(item => {
-        if (item.folder === 'trash' && item.deletedAt) {
-            return (now - item.deletedAt) < sevenDaysMs;
-        }
+        if (item.folder === 'trash' && item.deletedAt) return (now - item.deletedAt) < sevenDaysMs;
         return true;
     });
     saveToLocalStorage();
 }
-
-window.emptyTrashNow = function() {
+window.emptyTrashNow = function () {
     appItems = appItems.filter(item => item.folder !== 'trash');
     saveToLocalStorage();
 };
 
 // =============================================================================
-// 5. BASE RADIAL FLOATING ACTION MENU & PAPER MODALS (Base Features)
+// 5. BASE FAM & PAPER MODALS
 // =============================================================================
 const famMainBtn = document.getElementById('fam-main-btn');
 const radialOptions = document.getElementById('radial-options');
-if (famMainBtn) {
-    famMainBtn.addEventListener('click', () => radialOptions.classList.toggle('open'));
-}
+if (famMainBtn) famMainBtn.addEventListener('click', () => radialOptions.classList.toggle('open'));
 
 let currentNoteType = 'note';
 let editingNoteId = null;
@@ -306,32 +245,26 @@ let baseCanvasContext = null;
 let isBaseDrawing = false;
 let currentBaseCanvasTool = 'marker';
 
-window.openNoteModal = function(type) {
+window.openNoteModal = function (type) {
     currentNoteType = type;
     editingNoteId = null;
     uploadedImageData = null;
     if (radialOptions) radialOptions.classList.remove('open');
-    
     const padContainer = document.getElementById('writing-pad-container');
-    if (padContainer) padContainer.className = `paper-writing-pad ${type === 'drawing' ? 'plain-canvas' : ''}`;
-    
+    if (padContainer) padContainer.className = `paper-writing-pad ${(type === 'drawing' || type === 'calculator') ? 'plain-canvas' : ''}`;
     const paperModal = document.getElementById('paper-modal');
     if (paperModal) paperModal.classList.add('open');
-    
     const titleElem = document.getElementById('modal-title');
-    if (titleElem) titleElem.textContent = `Create ${type.toUpperCase()}`;
-    
+    if (titleElem) titleElem.textContent = `Create ${type.charAt(0).toUpperCase() + type.slice(1)}`;
     const pinCheck = document.getElementById('pad-pin-checkbox');
     if (pinCheck) pinCheck.checked = false;
-    
     const padBody = document.getElementById('pad-body-content');
     if (!padBody) return;
 
-    if (type === 'note' || type === 'text' || type === 'reminder') {
+if (type === 'note' || type === 'text' || type === 'reminder') {
         padBody.innerHTML = `
             <input type="text" class="pad-input" id="note-title" placeholder="Title..." style="font-weight:bold; margin-bottom:10px;">
-            <textarea class="pad-textarea" id="note-body" placeholder="Write here..."></textarea>
-        `;
+            <textarea class="pad-textarea" id="note-body" placeholder="Write here..."></textarea>`;
     } else if (type === 'list') {
         padBody.innerHTML = `
             <input type="text" class="pad-input" id="note-title" placeholder="List Title..." style="font-weight:bold; margin-bottom:10px;">
@@ -345,8 +278,7 @@ window.openNoteModal = function(type) {
                     <input type="text" class="list-item-input" placeholder="Item 1..." onkeydown="handleListEnter(event, 0)">
                 </div>
             </div>
-            <button type="button" class="pomo-btn" style="font-size:0.75rem; padding:4px 12px; margin-top:10px;" onclick="addListItemRow()">+ Add Item</button>
-        `;
+            <button type="button" class="pomo-btn" style="font-size:0.75rem; padding:4px 12px; margin-top:10px;" onclick="addListItemRow()">+ Add Item</button>`;
     } else if (type === 'image') {
         padBody.innerHTML = `
             <input type="text" class="pad-input" id="note-title" placeholder="Image Title..." style="font-weight:bold; margin-bottom:10px;">
@@ -354,8 +286,40 @@ window.openNoteModal = function(type) {
                 <div id="image-preview-area">Click to Select / Upload Photo from Storage</div>
                 <input type="file" id="file-input" accept="image/*" style="display:none;" onchange="handleImageUpload(event)">
             </div>
-            <textarea class="pad-textarea" id="note-body" placeholder="Add notes or caption for this image..."></textarea>
-        `;
+            <textarea class="pad-textarea" id="note-body" placeholder="Add notes or caption for this image..."></textarea>`;
+    } else if (type === 'calculator') {
+        padBody.innerHTML = `
+            <div class="calc-screen">
+                <div class="calc-formula" id="fcalc-formula">&nbsp;</div>
+                <div class="calc-value" id="fcalc-display">0</div>
+            </div>
+            <div class="calc-keys">
+                <button type="button" class="calc-btn btn-clear" onclick="fcalcClear()">C</button>
+                <button type="button" class="calc-btn btn-del" onclick="fcalcDelete()">DEL</button>
+                <button type="button" class="calc-btn btn-op" onclick="fcalcOp('/')">÷</button>
+                <button type="button" class="calc-btn btn-op" onclick="fcalcOp('*')">×</button>
+                <button type="button" class="calc-btn btn-num" onclick="fcalcNum('7')">7</button>
+                <button type="button" class="calc-btn btn-num" onclick="fcalcNum('8')">8</button>
+                <button type="button" class="calc-btn btn-num" onclick="fcalcNum('9')">9</button>
+                <button type="button" class="calc-btn btn-op" onclick="fcalcOp('-')">-</button>
+                <button type="button" class="calc-btn btn-num" onclick="fcalcNum('4')">4</button>
+                <button type="button" class="calc-btn btn-num" onclick="fcalcNum('5')">5</button>
+                <button type="button" class="calc-btn btn-num" onclick="fcalcNum('6')">6</button>
+                <button type="button" class="calc-btn btn-op" onclick="fcalcOp('+')">+</button>
+                <button type="button" class="calc-btn btn-num" onclick="fcalcNum('1')">1</button>
+                <button type="button" class="calc-btn btn-num" onclick="fcalcNum('2')">2</button>
+                <button type="button" class="calc-btn btn-num" onclick="fcalcNum('3')">3</button>
+                <button type="button" class="calc-btn btn-equals" onclick="fcalcEqual()">=</button>
+                <button type="button" class="calc-btn btn-num zero-btn" onclick="fcalcNum('0')">0</button>
+                <button type="button" class="calc-btn btn-num" onclick="fcalcNum('.')">.</button>
+            </div>
+            <div class="calc-history-box">
+                <div class="history-header"><h3>History</h3>
+                    <div class="history-actions-row"><button type="button" class="btn-hist-small" onclick="clearCalculationHistory()">Clear</button></div>
+                </div>
+                <div class="calc-history-list" id="fcalc-history-list"></div>
+            </div>`;
+        renderCalcHistoryUI();
     } else if (type === 'drawing') {
         padBody.innerHTML = `
             <input type="text" class="pad-input" id="note-title" placeholder="Drawing Title..." style="font-weight:bold; margin-bottom:8px;">
@@ -367,49 +331,41 @@ window.openNoteModal = function(type) {
                     <button type="button" class="canvas-tool-btn" onclick="clearBaseCanvas()">Clear</button>
                 </div>
             </div>
-            <textarea class="pad-textarea" id="note-body" placeholder="Notes about this drawing..." style="margin-top:8px;"></textarea>
-        `;
+            <textarea class="pad-textarea" id="note-body" placeholder="Notes about this drawing..." style="margin-top:8px;"></textarea>`;
         setTimeout(initBaseCanvas, 100);
     }
 };
 
-window.setListType = function(type) {
+window.setListType = function (type) {
     currentListType = type;
     document.getElementById('btn-list-bullet').classList.toggle('active', type === 'bullet');
     document.getElementById('btn-list-number').classList.toggle('active', type === 'number');
-    
-    const prefixes = document.querySelectorAll('.list-bullet-prefix');
-    prefixes.forEach((p, idx) => {
+    document.querySelectorAll('.list-bullet-prefix').forEach((p, idx) => {
         p.textContent = type === 'bullet' ? '•' : `${idx + 1}.`;
     });
 };
 
-window.addListItemRow = function() {
+window.addListItemRow = function () {
     const box = document.getElementById('list-items-box');
     if (!box) return;
     const idx = box.children.length;
     const row = document.createElement('div');
     row.className = 'list-item-row';
+    const prefix = currentListType === 'bullet' ? '•' : `${idx + 1}.`;
     row.innerHTML = `
-        <span class="list-bullet-prefix">${currentListType === 'bullet' ? '•' : `${idx + 1}.`}</span>
-        <input type="text" class="list-item-input" placeholder="Item ${idx + 1}..." onkeydown="handleListEnter(event, ${idx})">
-    `;
+        <span class="list-bullet-prefix">${prefix}</span>
+        <input type="text" class="list-item-input" placeholder="Item ${idx + 1}..." onkeydown="handleListEnter(event, ${idx})">`;
     box.appendChild(row);
     row.querySelector('input').focus();
 };
 
-window.handleListEnter = function(e, idx) {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        addListItemRow();
-    }
-};
+window.handleListEnter = function (e, idx) { if (e.key === 'Enter') { e.preventDefault(); addListItemRow(); } };
 
-window.handleImageUpload = function(e) {
+window.handleImageUpload = function (e) {
     const file = e.target.files[0];
     if (file) {
         const reader = new FileReader();
-        reader.onload = function(evt) {
+        reader.onload = function (evt) {
             uploadedImageData = evt.target.result;
             const area = document.getElementById('image-preview-area');
             if (area) area.innerHTML = `<img src="${uploadedImageData}" class="image-preview-img">`;
@@ -425,8 +381,6 @@ function initBaseCanvas() {
     baseCanvasContext.lineCap = 'round';
     baseCanvasContext.lineJoin = 'round';
     baseCanvasContext.lineWidth = 3;
-    baseCanvasContext.strokeStyle = '#5c3d2e';
-
     canvas.onmousedown = (e) => { isBaseDrawing = true; drawBaseCanvas(e); };
     canvas.onmousemove = (e) => { drawBaseCanvas(e); };
     canvas.onmouseup = () => { isBaseDrawing = false; baseCanvasContext.beginPath(); };
@@ -436,231 +390,207 @@ function initBaseCanvas() {
 function drawBaseCanvas(e) {
     if (!isBaseDrawing || !baseCanvasContext) return;
     const rect = e.target.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    if (currentBaseCanvasTool === 'eraser') {
-        baseCanvasContext.strokeStyle = '#ffffff';
-        baseCanvasContext.lineWidth = 16;
-    } else {
-        baseCanvasContext.strokeStyle = '#5c3d2e';
-        baseCanvasContext.lineWidth = 3;
-    }
-
+    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    if (currentBaseCanvasTool === 'eraser') { baseCanvasContext.strokeStyle = '#ffffff'; baseCanvasContext.lineWidth = 16; }
+    else { baseCanvasContext.strokeStyle = '#5c3d2e'; baseCanvasContext.lineWidth = 3; }
     baseCanvasContext.lineTo(x, y);
     baseCanvasContext.stroke();
     baseCanvasContext.beginPath();
     baseCanvasContext.moveTo(x, y);
 }
 
-window.setBaseCanvasTool = function(tool) {
+window.setBaseCanvasTool = function (tool) {
     currentBaseCanvasTool = tool;
     const marker = document.getElementById('tool-marker');
     const eraser = document.getElementById('tool-eraser');
     if (marker) marker.classList.toggle('active', tool === 'marker');
     if (eraser) eraser.classList.toggle('active', tool === 'eraser');
 };
-
-window.clearBaseCanvas = function() {
+window.clearBaseCanvas = function () {
     const canvas = document.getElementById('drawing-canvas');
-    if (baseCanvasContext && canvas) {
-        baseCanvasContext.clearRect(0, 0, canvas.width, canvas.height);
-    }
+    if (baseCanvasContext && canvas) baseCanvasContext.clearRect(0, 0, canvas.width, canvas.height);
 };
 
-window.openEditNoteModal = function(id) {
+window.openEditNoteModal = function (id) {
     const item = appItems.find(i => i.id === id);
     if (!item) return;
-
     editingNoteId = id;
     currentNoteType = item.type;
     document.getElementById('paper-modal').classList.add('open');
-    document.getElementById('modal-title').textContent = `Edit Item`;
+    document.getElementById('modal-title').textContent = 'Edit Item';
     document.getElementById('pad-pin-checkbox').checked = item.isPinned;
-
-    const padBody = document.getElementById('pad-body-content');
-    padBody.innerHTML = `
+    document.getElementById('pad-body-content').innerHTML = `
         <input type="text" class="pad-input" id="note-title" value="${escapeHtml(item.title || '')}" placeholder="Title..." style="font-weight:bold; margin-bottom:10px;">
-        <textarea class="pad-textarea" id="note-body" placeholder="Write here...">${escapeHtml(item.body || '')}</textarea>
-    `;
+        <textarea class="pad-textarea" id="note-body" placeholder="Write here...">${escapeHtml(item.body || '')}</textarea>`;
 };
 
-window.closeNoteModal = function() {
+window.closeNoteModal = function () {
     const modal = document.getElementById('paper-modal');
     if (modal) modal.classList.remove('open');
     editingNoteId = null;
 };
 
-window.savePaperNote = function() {
+window.savePaperNote = function () {
+    if (currentNoteType === 'calculator') { closeNoteModal(); return; }
     const title = document.getElementById('note-title')?.value || 'Untitled';
     let body = document.getElementById('note-body')?.value || '';
     const isPinned = document.getElementById('pad-pin-checkbox')?.checked || false;
 
-    if (currentNoteType === 'list') {
+if (currentNoteType === 'list') {
         const inputs = document.querySelectorAll('.list-item-input');
         const listItems = [];
         inputs.forEach((inp, idx) => {
             if (inp.value.trim()) {
                 const prefix = currentListType === 'bullet' ? '•' : `${idx + 1}.`;
-                listItems.push(`${prefix} ${inp.value.trim()}`);
+                listItems.push(`${prefix} ${escapeHtml(inp.value.trim())}`);
             }
         });
         body = listItems.join('<br>');
     }
-
     let drawingData = null;
     if (currentNoteType === 'drawing') {
         const canvas = document.getElementById('drawing-canvas');
         if (canvas) drawingData = canvas.toDataURL();
     }
-
     const targetFolder = (currentNoteType === 'reminder') ? 'reminders' : 'notes';
 
-    if (editingNoteId !== null) {
+if (editingNoteId !== null) {
         const item = appItems.find(i => i.id === editingNoteId);
         if (item) {
-            item.title = title;
-            item.body = body;
-            item.isPinned = isPinned;
-            item.timestamp = Date.now();
+            item.title = title; item.body = body; item.isPinned = isPinned;
+            if (uploadedImageData) item.imageData = uploadedImageData;
+            if (drawingData) item.drawingData = drawingData;
         }
     } else {
-        appItems.push({
-            id: Date.now(),
-            type: currentNoteType,
-            title: title,
-            body: body,
-            imageData: uploadedImageData,
-            drawingData: drawingData,
-            isPinned: isPinned,
-            timestamp: Date.now(),
-            folder: targetFolder
-        });
+        appItems.push({ id: Date.now(), type: currentNoteType, title, body,
+            imageData: uploadedImageData, drawingData: drawingData,
+            isPinned, timestamp: Date.now(), folder: targetFolder });
     }
     saveToLocalStorage();
     closeNoteModal();
 };
 
-window.discardPaperNote = function() {
-    if (editingNoteId !== null) {
-        appItems = appItems.filter(i => i.id !== editingNoteId);
-        saveToLocalStorage();
-    }
+window.discardPaperNote = function () {
+    if (editingNoteId !== null) { appItems = appItems.filter(i => i.id !== editingNoteId); saveToLocalStorage(); }
     closeNoteModal();
 };
-
-window.sharePaperNote = function() {
-    alert("Note copied to clipboard for sharing!");
-};
+window.sharePaperNote = function () { alert("Note copied to clipboard for sharing!"); };
 
 // =============================================================================
-// 6. SYNCHRONIZED TIMER ENGINE (Runs Across Base App & Floating Companion)
+// 6. TIMER ENGINE — DEADLINE-BASED (the core fix)
 // =============================================================================
 function updateAllTimerDisplays() {
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
-    
     const timeFormatted = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-    
     const baseTimer = document.getElementById('timer');
     if (baseTimer) baseTimer.textContent = timeFormatted;
-
-    const compTimer = document.getElementById('companion-timer-display');
+    const compTimer = getEl('companion-timer-display');
     if (compTimer) compTimer.textContent = timeFormatted;
-
     document.title = `${timeFormatted} - Pippin Cozy Study Desktop`;
+    const urgent = isRunning && totalSeconds > 0 && totalSeconds <= 10;
+    if (baseTimer) baseTimer.classList.toggle('timer-urgent', urgent);
+    if (compTimer) compTimer.classList.toggle('timer-urgent', urgent);
 }
 
-function updateMascotEmotion(state) {
+function setAllMascots(src) {
     const baseMascot = document.getElementById('mascot-img');
-    const compMascot = document.getElementById('companion-mascot-img');
-
-    let src = 'assets/pippinchill.png';
-    if (state === 'focus' || state === 'start') src = 'assets/pippinnerd.png';
-    else if (state === 'pause' || state === 'stop') src = 'assets/pippinsad.png';
-    else if (state === 'completed') src = 'assets/pippindawg.png';
-
     if (baseMascot) baseMascot.src = src;
-    if (compMascot) compMascot.src = src;
+    getDoc().querySelectorAll('.companion-mascot-img').forEach(m => { m.src = src; });
 }
 
-window.cycleMascotImage = function() {
+/* STATIC mascot: expression changes by image swap ONLY — no motion */
+function updateMascotEmotion(state) {
+    let src = 'assets/pippinchill.png';
+    if (state === 'focus' || state === 'start') src = 'assets/pippinnerd.png';   // study face
+    else if (state === 'pause' || state === 'stop') src = 'assets/pippinsad.png'; // sad face
+    else if (state === 'completed') src = 'assets/pippindawg.png';                // happy face
+    setAllMascots(src);
+}
+
+window.cycleMascotImage = function () {
     currentMascotIndex = (currentMascotIndex + 1) % mascotAssets.length;
-    const baseMascot = document.getElementById('mascot-img');
-    const compMascot = document.getElementById('companion-mascot-img');
-    if (baseMascot) baseMascot.src = mascotAssets[currentMascotIndex];
-    if (compMascot) compMascot.src = mascotAssets[currentMascotIndex];
+    setAllMascots(mascotAssets[currentMascotIndex]);
 };
 
-window.startTimer = function() {
+function updatePlayButtonUI() {
+    const icon = getEl('companion-play-icon');
+    const label = getEl('play-btn-label');
+    if (icon) icon.textContent = isRunning ? '❚❚' : '▶';
+    if (label) label.textContent = isRunning ? 'Pause' : 'Start';
+}
+
+window.toggleTimerRunning = function () { if (isRunning) pauseTimer(); else startTimer(); };
+
+window.startTimer = function () {
     if (isRunning) return;
     if (totalSeconds <= 0) totalSeconds = initialSeconds;
-
+    timerDeadline = Date.now() + totalSeconds * 1000;   // wall-clock anchor: no drift, survives tab throttling
     isRunning = true;
     updateMascotEmotion('focus');
-
+    updatePlayButtonUI();
     timerInterval = setInterval(() => {
-        if (totalSeconds > 0) {
-            totalSeconds--;
-            updateAllTimerDisplays();
-        } else {
+        totalSeconds = Math.max(0, Math.round((timerDeadline - Date.now()) / 1000));
+        updateAllTimerDisplays();
+        if (totalSeconds <= 0) {
             clearInterval(timerInterval);
             isRunning = false;
+            timerDeadline = null;
             updateMascotEmotion('completed');
+            updatePlayButtonUI();
             alert("Session completed successfully!");
         }
-    }, 1000);
+    }, 250);
 };
 
-window.pauseTimer = function() {
+window.pauseTimer = function () {
     if (!isRunning) return;
+    totalSeconds = Math.max(0, Math.round((timerDeadline - Date.now()) / 1000));
     clearInterval(timerInterval);
     isRunning = false;
+    timerDeadline = null;
     updateMascotEmotion('pause');
+    updatePlayButtonUI();
+    updateAllTimerDisplays();
 };
 
-window.resetTimer = function() {
+window.resetTimer = function () {
     clearInterval(timerInterval);
     isRunning = false;
+    timerDeadline = null;
     totalSeconds = initialSeconds;
     updateMascotEmotion('idle');
     updateAllTimerDisplays();
+    updatePlayButtonUI();
 };
 
-window.stopTimer = function() {
+window.restartTimer = function () {
     clearInterval(timerInterval);
     isRunning = false;
-    totalSeconds = 0;
-    updateMascotEmotion('stop');
-    updateAllTimerDisplays();
-};
-
-window.restartTimer = function() {
-    clearInterval(timerInterval);
+    timerDeadline = null;
     totalSeconds = initialSeconds;
-    isRunning = false;
     updateAllTimerDisplays();
     startTimer();
 };
 
-window.setMode = function(minutes, message, buttonElement) {
+window.setMode = function (minutes, message, buttonElement) {
     clearInterval(timerInterval);
     isRunning = false;
+    timerDeadline = null;
     totalSeconds = minutes * 60;
     initialSeconds = minutes * 60;
     updateMascotEmotion('idle');
     updateAllTimerDisplays();
-
+    updatePlayButtonUI();
     const statusText = document.getElementById('status-text');
     if (statusText) statusText.textContent = message;
-
-    const compMode = document.getElementById('companion-mode-text');
+    const compMode = getEl('companion-mode-text');
     if (compMode) compMode.textContent = message;
-
     document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
     if (buttonElement) buttonElement.classList.add('active');
 };
+
 
 // Base timer click-to-edit
 const baseTimerDisplay = document.getElementById('timer');
@@ -674,285 +604,173 @@ const saveTimeBtn = document.getElementById('save-time-btn');
 if (baseTimerDisplay) {
     baseTimerDisplay.addEventListener('click', () => {
         if (isRunning) return;
-        const h = Math.floor(totalSeconds / 3600);
-        const m = Math.floor((totalSeconds % 3600) / 60);
-        const s = totalSeconds % 60;
-
-        inputHours.value = h;
-        inputMinutes.value = m;
-        inputSeconds.value = s;
-
+        inputHours.value = Math.floor(totalSeconds / 3600);
+        inputMinutes.value = Math.floor((totalSeconds % 3600) / 60);
+        inputSeconds.value = totalSeconds % 60;
         baseTimerDisplay.style.display = 'none';
         if (controlsContainer) controlsContainer.style.display = 'none';
         if (inputContainer) inputContainer.classList.add('active');
     });
 }
-
 if (saveTimeBtn) {
     saveTimeBtn.addEventListener('click', () => {
         const h = parseInt(inputHours.value, 10) || 0;
         const m = parseInt(inputMinutes.value, 10) || 0;
         const s = parseInt(inputSeconds.value, 10) || 0;
-
         totalSeconds = (h * 3600) + (m * 60) + s;
         initialSeconds = totalSeconds;
         updateAllTimerDisplays();
-
         if (inputContainer) inputContainer.classList.remove('active');
-        if (baseTimerDisplay) baseTimerDisplay.style.display = 'block';
+        baseTimerDisplay.style.display = 'block';
         if (controlsContainer) controlsContainer.style.display = 'flex';
     });
 }
 
 // =============================================================================
-// 7. ENHANCED FLOATING COMPANION WIDGET CONTROLLER
+// 7. COMPANION CONTROLLER
 // =============================================================================
-window.toggleMiniMode = function(enableMini) {
-    companionState.isMiniMode = enableMini;
-    document.body.classList.toggle('mini-mode-active', enableMini);
-    
-    const companion = document.getElementById('pippin-floating-companion');
-    if (companion) {
-        companion.style.display = enableMini ? 'flex' : 'none';
-        if (enableMini) updateAllTimerDisplays();
-    }
-};
-
-// Companion Inline Time Edit
-window.enableFloatingTimeEdit = function() {
+window.enableFloatingTimeEdit = function () {
     if (isRunning) return;
-    const box = document.getElementById('companion-time-edit-box');
-    const display = document.getElementById('companion-timer-display');
-    if (box && display) {
-        display.style.display = 'none';
-        box.classList.add('active');
-
-        const h = Math.floor(totalSeconds / 3600);
-        const m = Math.floor((totalSeconds % 3600) / 60);
-        const s = totalSeconds % 60;
-
-        document.getElementById('floating-input-h').value = h;
-        document.getElementById('floating-input-m').value = m;
-        document.getElementById('floating-input-s').value = s;
-    }
+    const box = getEl('companion-time-edit-box');
+    const display = getEl('companion-timer-display');
+    if (!box || !display) return;
+    display.style.display = 'none';
+    box.classList.add('active');
+    getEl('floating-input-h').value = Math.floor(totalSeconds / 3600);
+    getEl('floating-input-m').value = Math.floor((totalSeconds % 3600) / 60);
+    getEl('floating-input-s').value = totalSeconds % 60;
 };
 
-window.saveFloatingTimeEdit = function() {
-    const h = parseInt(document.getElementById('floating-input-h').value, 10) || 0;
-    const m = parseInt(document.getElementById('floating-input-m').value, 10) || 0;
-    const s = parseInt(document.getElementById('floating-input-s').value, 10) || 0;
-
+window.saveFloatingTimeEdit = function () {
+    const h = parseInt(getEl('floating-input-h').value, 10) || 0;
+    const m = parseInt(getEl('floating-input-m').value, 10) || 0;
+    const s = parseInt(getEl('floating-input-s').value, 10) || 0;
     totalSeconds = Math.max(1, (h * 3600) + (m * 60) + s);
     initialSeconds = totalSeconds;
     updateAllTimerDisplays();
     cancelFloatingTimeEdit();
 };
 
-window.cancelFloatingTimeEdit = function() {
-    const box = document.getElementById('companion-time-edit-box');
-    const display = document.getElementById('companion-timer-display');
-    if (box && display) {
-        box.classList.remove('active');
-        display.style.display = 'block';
+window.cancelFloatingTimeEdit = function () {
+    const box = getEl('companion-time-edit-box');
+    const display = getEl('companion-timer-display');
+    if (box) box.classList.remove('active');
+    if (display) display.style.display = 'block';
+};
+
+window.closeCompanion = function () {
+    if (companionState.isPipActive && companionState.pipWindow) companionState.pipWindow.close();
+    else {
+        const c = companionRoot();
+        if (c) c.style.display = 'none';
+        companionState.isInTabFallback = false;
     }
 };
 
-// Lock / Unlock Toggle
-window.toggleCompanionLock = function() {
+window.toggleCompanionLock = function () {
     companionState.isLocked = !companionState.isLocked;
-    const companion = document.getElementById('pippin-floating-companion');
-    const lockIcon = document.getElementById('lock-icon');
-    const lockText = document.getElementById('lock-text');
-    const lockBadge = document.getElementById('companion-lock-badge');
+    const c = companionRoot();
+    if (!c) return;
+    c.classList.toggle('mode-locked', companionState.isLocked);
+    c.classList.toggle('mode-unlocked', !companionState.isLocked);
+    const btn = getEl('companion-lock-btn');
+    if (btn) btn.textContent = companionState.isLocked ? 'Unlock' : 'Lock';
+    armCompanionIdle();
+};
 
-    if (!companion) return;
-
-    if (companionState.isLocked) {
-        companion.classList.remove('mode-unlocked');
-        companion.classList.add('mode-locked');
-        if (lockIcon) lockIcon.textContent = '🔒';
-        if (lockText) lockText.textContent = 'Unlock';
-        if (lockBadge) lockBadge.textContent = 'Locked';
-    } else {
-        companion.classList.remove('mode-locked');
-        companion.classList.add('mode-unlocked');
-        if (lockIcon) lockIcon.textContent = '🔓';
-        if (lockText) lockText.textContent = 'Lock';
-        if (lockBadge) lockBadge.textContent = 'Unlocked';
+let idleFadeTimer = null;
+function armCompanionIdle() {
+    const c = companionRoot();
+    if (!c) return;
+    clearTimeout(idleFadeTimer);
+    c.classList.remove('companion-idle');
+    if (!companionState.isLocked) {
+        idleFadeTimer = setTimeout(() => {
+            const root = companionRoot();
+            if (root && !companionState.isLocked) root.classList.add('companion-idle');
+        }, 5000);
     }
-};
+}
+function initCompanionIdleFade() {
+    const c = document.getElementById('pippin-floating-companion');
+    if (!c) return;
+    ['pointerenter', 'pointermove', 'pointerdown', 'focusin'].forEach(ev =>
+        c.addEventListener(ev, armCompanionIdle, { passive: true }));
+}
 
-// Size Presets Menu
-window.toggleCompanionSizeMenu = function() {
-    const menu = document.getElementById('companion-size-menu');
-    if (menu) menu.classList.toggle('open');
-};
-
-window.setCompanionPreset = function(preset) {
-    const companion = document.getElementById('pippin-floating-companion');
-    const menu = document.getElementById('companion-size-menu');
-    if (menu) menu.classList.remove('open');
-    if (!companion) return;
-
-    companion.classList.remove('size-dot', 'size-small', 'size-medium', 'size-large', 'size-fullscreen');
-    companion.classList.add(`size-${preset}`);
-    companionState.currentPreset = preset;
-
-    companion.style.width = '';
-    companion.style.height = '';
-
-    if (preset === 'fullscreen') {
-        companion.style.left = '10px';
-        companion.style.top = '10px';
-    }
-};
-
-// MultiHub Radial Menu (+)
-window.toggleFloatingMultiHub = function() {
+window.toggleFloatingMultiHub = function () {
     companionState.isMultiHubOpen = !companionState.isMultiHubOpen;
-    const wrapper = document.getElementById('companion-multihub-wrapper');
+    const wrapper = getEl('companion-multihub-wrapper');
     if (wrapper) wrapper.classList.toggle('open', companionState.isMultiHubOpen);
+    const root = companionRoot();
+    if (root) root.classList.toggle('hub-open', companionState.isMultiHubOpen); // un-clip the pills
+    armCompanionIdle();
 };
 
-window.openFloatingTool = function(toolName) {
+window.openFloatingTool = function (toolName) {
     companionState.activeTool = toolName;
     companionState.isMultiHubOpen = false;
-
-    const wrapper = document.getElementById('companion-multihub-wrapper');
+    const wrapper = getEl('companion-multihub-wrapper');
     if (wrapper) wrapper.classList.remove('open');
-
-    const subWin = document.getElementById('floating-sub-window');
-    const title = document.getElementById('sub-window-title');
-    if (!subWin || !title) return;
-
+    const root = companionRoot();
+    if (root) root.classList.remove('hub-open');   // restore scrolling for the tool drawer
+    const subWin = getEl('floating-sub-window');
+    if (!subWin) return;
     subWin.classList.add('open');
-    title.textContent = toolName.toUpperCase();
-
-    // Hide all tool views
-    document.querySelectorAll('.f-tool-view').forEach(v => v.style.display = 'none');
-
-    const targetView = document.getElementById(`ftool-${toolName}`);
-    if (targetView) targetView.style.display = 'flex';
-
+    const titles = { notes:'Notes', lists:'Lists', drawing:'Drawing', image:'Image', calculator:'Calculator', shortcuts:'Shortcuts' };
+    const title = getEl('sub-window-title');
+    if (title) title.textContent = titles[toolName] || toolName.toUpperCase();
+    getDoc().querySelectorAll('.f-tool-view').forEach(v => v.style.display = 'none');
+    const view = getEl('ftool-' + toolName);
+    if (view) view.style.display = 'flex';
     if (toolName === 'calculator') renderCalcHistoryUI();
-    else if (toolName === 'lists') renderFloatingListsUI();
-    else if (toolName === 'notes') switchFloatingNotesTab('write');
     else if (toolName === 'drawing') setTimeout(resizeFloatingCanvas, 80);
+    armCompanionIdle();
 };
 
-window.closeFloatingSubWindow = function() {
+window.closeFloatingSubWindow = function () {
     companionState.activeTool = null;
-    const subWin = document.getElementById('floating-sub-window');
+    const subWin = getEl('floating-sub-window');
     if (subWin) subWin.classList.remove('open');
 };
 
+
 // =============================================================================
-// COMPANION TOOLS IMPLEMENTATION
+// COMPANION TOOLS
 // =============================================================================
-
-// --- 1. FLOATING NOTES ---
-window.switchFloatingNotesTab = function(tab) {
-    const writeBox = document.getElementById('fnotes-write-box');
-    const listBox = document.getElementById('fnotes-list-box');
-    const btnWrite = document.getElementById('btn-fnotes-write');
-    const btnList = document.getElementById('btn-fnotes-list');
-
-    if (tab === 'write') {
-        if (writeBox) writeBox.style.display = 'block';
-        if (listBox) listBox.style.display = 'none';
-        if (btnWrite) btnWrite.classList.add('active');
-        if (btnList) btnList.classList.remove('active');
-    } else {
-        if (writeBox) writeBox.style.display = 'none';
-        if (listBox) listBox.style.display = 'flex';
-        if (btnWrite) btnWrite.classList.remove('active');
-        if (btnList) btnList.classList.add('active');
-        renderFloatingNotesList();
-    }
-};
-
-window.saveFloatingNote = function() {
-    const title = document.getElementById('float-note-title')?.value.trim() || 'Untitled';
-    const body = document.getElementById('float-note-body')?.value.trim() || '';
-
+window.saveFloatingNote = function () {
+    const title = getEl('float-note-title')?.value.trim() || 'Untitled';
+    const body = getEl('float-note-body')?.value.trim() || '';
     if (!body) { alert('Please enter note text.'); return; }
-
     appItems.unshift({
-        id: Date.now(),
-        type: 'note',
-        title: title,
-        body: body,
-        isPinned: false,
-        timestamp: Date.now(),
-        folder: 'notes'
+        id: Date.now(), type: 'note', title: title, body: body,
+        isPinned: false, timestamp: Date.now(), folder: 'notes'
     });
     saveToLocalStorage();
-    discardFloatingNote();
-    switchFloatingNotesTab('list');
+    if (getEl('float-note-title')) getEl('float-note-title').value = '';
+    if (getEl('float-note-body')) getEl('float-note-body').value = '';
 };
 
-window.discardFloatingNote = function() {
-    const t = document.getElementById('float-note-title');
-    const b = document.getElementById('float-note-body');
-    if (t) t.value = '';
-    if (b) b.value = '';
+// --- LISTS TOOL ---
+window.handleFloatingListEnter = function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); addFloatingListItem(); }
 };
 
-function renderFloatingNotesList() {
-    const listBox = document.getElementById('fnotes-list-box');
-    if (!listBox) return;
-    listBox.innerHTML = '';
-    const notes = appItems.filter(i => i.folder === 'notes');
-    if (notes.length === 0) {
-        listBox.innerHTML = '<div style="font-size:0.75rem; color:#7a5c4d; text-align:center;">No saved notes yet.</div>';
-        return;
-    }
-    notes.forEach(n => {
-        const card = document.createElement('div');
-        card.className = 'workspace-card';
-        card.innerHTML = `
-            <div class="card-title-text">${escapeHtml(n.title)}</div>
-            <div class="card-body-text">${escapeHtml(n.body.slice(0, 50))}...</div>
-        `;
-        listBox.appendChild(card);
-    });
-}
-
-// --- 2. FLOATING LISTS ---
-window.setFloatingListStyle = function(style) {
-    companionState.listStyle = style;
-    document.getElementById('btn-flist-bullet').classList.toggle('active', style === 'bullet');
-    document.getElementById('btn-flist-numbered').classList.toggle('active', style === 'numbered');
-    renderFloatingListRows();
-};
-
-window.handleFloatingListEnter = function(e) {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        addFloatingListItem();
-    }
-};
-
-window.addFloatingListItem = function() {
-    const input = document.getElementById('float-new-item-input');
+window.addFloatingListItem = function () {
+    const input = getEl('float-new-item-input');
     if (!input || !input.value.trim()) return;
-
-    companionState.currentListItems.push({
-        id: Date.now(),
-        text: input.value.trim(),
-        done: false
-    });
+    companionState.currentListItems.push({ id: Date.now(), text: input.value.trim(), done: false });
     input.value = '';
     renderFloatingListRows();
     input.focus();
 };
 
 function renderFloatingListRows() {
-    const box = document.getElementById('float-list-items-box');
+    const box = getEl('float-list-items-box');
     if (!box) return;
     box.innerHTML = '';
     companionState.currentListItems.forEach((item, idx) => {
-        const row = document.createElement('div');
+        const row = document.createElement('li');
         row.className = 'list-item-row';
         const prefix = companionState.listStyle === 'bullet' ? '•' : `${idx + 1}.`;
         row.innerHTML = `
@@ -965,86 +783,17 @@ function renderFloatingListRows() {
     });
 }
 
-window.toggleFloatingListItemDone = function(id) {
+window.toggleFloatingListItemDone = function (id) {
     const item = companionState.currentListItems.find(i => i.id === id);
     if (item) { item.done = !item.done; renderFloatingListRows(); }
 };
 
-window.deleteFloatingListItem = function(id) {
+window.deleteFloatingListItem = function (id) {
     companionState.currentListItems = companionState.currentListItems.filter(i => i.id !== id);
     renderFloatingListRows();
 };
 
-window.saveFloatingList = function() {
-    const title = document.getElementById('float-list-title')?.value.trim() || 'Untitled List';
-    if (companionState.currentListItems.length === 0) { alert('Add at least one list item.'); return; }
-
-    companionState.savedLists.unshift({
-        id: Date.now(),
-        title: title,
-        style: companionState.listStyle,
-        items: [...companionState.currentListItems]
-    });
-    localStorage.setItem('pippin_saved_lists', JSON.stringify(companionState.savedLists));
-    discardFloatingList();
-    renderFloatingListsUI();
-    showFloatingSavedLists();
-};
-
-window.discardFloatingList = function() {
-    companionState.currentListItems = [];
-    const t = document.getElementById('float-list-title');
-    if (t) t.value = '';
-    renderFloatingListRows();
-};
-
-window.showFloatingSavedLists = function() {
-    const drawer = document.getElementById('flists-drawer');
-    if (!drawer) return;
-    drawer.style.display = drawer.style.display === 'flex' ? 'none' : 'flex';
-    drawer.innerHTML = '';
-    if (companionState.savedLists.length === 0) {
-        drawer.innerHTML = '<div style="font-size:0.75rem; text-align:center; padding:8px;">No saved lists.</div>';
-        return;
-    }
-    companionState.savedLists.forEach(l => {
-        const card = document.createElement('div');
-        card.className = 'workspace-card';
-        card.innerHTML = `
-            <div style="font-weight:bold; font-size:0.8rem;">${escapeHtml(l.title)} (${l.items.length} items)</div>
-            <div style="display:flex; gap:4px; margin-top:4px;">
-                <button type="button" class="btn-hist-small" onclick="loadSavedListToFloating(${l.id})">Open</button>
-                <button type="button" class="btn-hist-small" onclick="deleteSavedFloatingList(${l.id})">✕</button>
-            </div>
-        `;
-        drawer.appendChild(card);
-    });
-};
-
-window.loadSavedListToFloating = function(id) {
-    const l = companionState.savedLists.find(i => i.id === id);
-    if (!l) return;
-    document.getElementById('float-list-title').value = l.title;
-    companionState.listStyle = l.style || 'bullet';
-    companionState.currentListItems = [...l.items];
-    setFloatingListStyle(companionState.listStyle);
-    renderFloatingListRows();
-    document.getElementById('flists-drawer').style.display = 'none';
-};
-
-window.deleteSavedFloatingList = function(id) {
-    companionState.savedLists = companionState.savedLists.filter(i => i.id !== id);
-    localStorage.setItem('pippin_saved_lists', JSON.stringify(companionState.savedLists));
-    renderFloatingListsUI();
-    showFloatingSavedLists();
-};
-
-function renderFloatingListsUI() {
-    const count = document.getElementById('flists-count');
-    if (count) count.textContent = companionState.savedLists.length;
-}
-
-// --- 3. FLOATING DRAWING ---
+// --- DRAWING TOOL ---
 let floatCanvasCtx = null;
 let lastFX = 0, lastFY = 0;
 
@@ -1052,39 +801,28 @@ function initCompanionCanvas() {
     const canvas = document.getElementById('float-drawing-canvas');
     if (!canvas) return;
     floatCanvasCtx = canvas.getContext('2d');
-
     canvas.addEventListener('pointerdown', (e) => {
         companionState.isDrawing = true;
         const rect = canvas.getBoundingClientRect();
         lastFX = (e.clientX - rect.left) * (canvas.width / rect.width);
         lastFY = (e.clientY - rect.top) * (canvas.height / rect.height);
     });
-
     canvas.addEventListener('pointermove', (e) => {
         if (!companionState.isDrawing || !floatCanvasCtx) return;
         const rect = canvas.getBoundingClientRect();
         const curX = (e.clientX - rect.left) * (canvas.width / rect.width);
         const curY = (e.clientY - rect.top) * (canvas.height / rect.height);
-
         floatCanvasCtx.beginPath();
         floatCanvasCtx.moveTo(lastFX, lastFY);
         floatCanvasCtx.lineTo(curX, curY);
         floatCanvasCtx.lineCap = 'round';
         floatCanvasCtx.lineJoin = 'round';
-
-        if (companionState.drawTool === 'eraser') {
-            floatCanvasCtx.strokeStyle = '#ffffff';
-            floatCanvasCtx.lineWidth = 14;
-        } else {
-            floatCanvasCtx.strokeStyle = companionState.drawColor;
-            floatCanvasCtx.lineWidth = 3;
-        }
-
+        floatCanvasCtx.strokeStyle = companionState.drawColor;
+        floatCanvasCtx.lineWidth = 3;
         floatCanvasCtx.stroke();
         lastFX = curX;
         lastFY = curY;
     });
-
     window.addEventListener('pointerup', () => { companionState.isDrawing = false; });
 }
 
@@ -1095,137 +833,83 @@ function resizeFloatingCanvas() {
     canvas.height = 140;
 }
 
-window.setFloatingCanvasTool = function(tool) {
-    companionState.drawTool = tool;
-    document.getElementById('ftool-marker').classList.toggle('active', tool === 'marker');
-    document.getElementById('ftool-eraser').classList.toggle('active', tool === 'eraser');
-};
+window.setFloatingDrawColor = function (c) { companionState.drawColor = c; };
 
-window.setFloatingDrawColor = function(c) {
-    companionState.drawColor = c;
-    setFloatingCanvasTool('marker');
-};
-
-window.clearFloatingCanvas = function() {
-    const canvas = document.getElementById('float-drawing-canvas');
+window.clearFloatingCanvas = function () {
+    const canvas = getEl('float-drawing-canvas');
     if (canvas && floatCanvasCtx) floatCanvasCtx.clearRect(0, 0, canvas.width, canvas.height);
 };
 
-window.saveFloatingDrawing = function() {
-    const canvas = document.getElementById('float-drawing-canvas');
-    if (!canvas) return;
-    companionState.savedDrawings.unshift({
-        id: Date.now(),
-        dataUrl: canvas.toDataURL('image/png'),
-        timestamp: Date.now()
+// --- IMAGE TOOL ---
+window.triggerFloatImagePick = function () {
+    const f = getEl('float-image-file');
+    if (f) f.click();
+};
+
+window.handleFloatImageUpload = function (e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+        companionState.floatImageData = evt.target.result;
+        const preview = getEl('float-image-preview');
+        if (preview) preview.innerHTML = `<img src="${companionState.floatImageData}" class="image-preview-img">`;
+    };
+    reader.readAsDataURL(file);
+};
+
+window.saveFloatingImage = function () {
+    if (!companionState.floatImageData) { alert('Please select an image first.'); return; }
+    appItems.unshift({
+        id: Date.now(), type: 'image',
+        title: getEl('float-image-title')?.value.trim() || 'Untitled Image',
+        body: getEl('float-image-caption')?.value.trim() || '',
+        imageData: companionState.floatImageData,
+        isPinned: false, timestamp: Date.now(), folder: 'notes'
     });
-    localStorage.setItem('pippin_drawings', JSON.stringify(companionState.savedDrawings));
-    renderFloatingDrawingsGalleryUI();
-    alert('Doodle saved to gallery!');
+    companionState.floatImageData = null;
+    saveToLocalStorage();
+    closeFloatingSubWindow();
 };
 
-window.discardFloatingDrawing = function() {
-    clearFloatingCanvas();
-};
-
-window.toggleFloatingDrawingGallery = function() {
-    const gallery = document.getElementById('fdrawings-gallery');
-    if (!gallery) return;
-    gallery.style.display = gallery.style.display === 'flex' ? 'none' : 'flex';
-    if (gallery.style.display === 'flex') renderFloatingDrawingsGalleryUI();
-};
-
-function renderFloatingDrawingsGalleryUI() {
-    const count = document.getElementById('fdrawings-count');
-    const gallery = document.getElementById('fdrawings-gallery');
-    if (count) count.textContent = companionState.savedDrawings.length;
-    if (!gallery) return;
-    gallery.innerHTML = '';
-    if (companionState.savedDrawings.length === 0) {
-        gallery.innerHTML = '<div style="font-size:0.75rem; text-align:center; padding:6px;">No doodles yet.</div>';
-        return;
-    }
-    companionState.savedDrawings.forEach(d => {
-        const item = document.createElement('div');
-        item.style.display = 'flex';
-        item.style.alignItems = 'center';
-        item.style.gap = '6px';
-        item.style.padding = '4px';
-        item.style.background = '#faf6f0';
-        item.style.borderRadius = '6px';
-        item.innerHTML = `
-            <img src="${d.dataUrl}" style="width:40px; height:30px; object-fit:cover; border-radius:4px; background:#fff; border:1px solid #e6dacb;">
-            <span style="flex:1; font-size:0.7rem;">${new Date(d.timestamp).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit'})}</span>
-            <button type="button" class="btn-del-hist" onclick="deleteFloatingDrawing(${d.id})">✕</button>
-        `;
-        gallery.appendChild(item);
-    });
-}
-
-window.deleteFloatingDrawing = function(id) {
-    companionState.savedDrawings = companionState.savedDrawings.filter(i => i.id !== id);
-    localStorage.setItem('pippin_drawings', JSON.stringify(companionState.savedDrawings));
-    renderFloatingDrawingsGalleryUI();
-};
-
-// --- 4. FLOATING CALCULATOR (C Button, DEL Single Char, Operations, History) ---
-window.fcalcNum = function(num) {
+// --- CALCULATOR TOOL ---
+window.fcalcNum = function (num) {
     if (companionState.calcExpression === '0') companionState.calcExpression = num;
     else companionState.calcExpression += num;
     updateFCalcDisplay();
 };
 
-window.fcalcDecimal = function() {
-    const parts = companionState.calcExpression.split(/[+\-*/]/);
-    const last = parts[parts.length - 1];
-    if (!last.includes('.')) {
-        companionState.calcExpression += '.';
-        updateFCalcDisplay();
-    }
-};
-
-window.fcalcOp = function(op) {
+window.fcalcOp = function (op) {
     const expr = companionState.calcExpression;
     const lastChar = expr.slice(-1);
-    if (['+', '-', '*', '/'].includes(lastChar)) {
-        companionState.calcExpression = expr.slice(0, -1) + op;
-    } else {
-        companionState.calcExpression += op;
-    }
+    if (['+', '-', '*', '/'].includes(lastChar)) companionState.calcExpression = expr.slice(0, -1) + op;
+    else companionState.calcExpression += op;
     updateFCalcDisplay();
 };
 
-// C Button: Clear everything (125+20 -> 0)
-window.fcalcClear = function() {
+window.fcalcClear = function () {
     companionState.calcExpression = '0';
     companionState.calcFormula = '';
     updateFCalcDisplay();
 };
 
-// DEL / Backspace: Deletes ONE character at a time (12345 -> 1234 -> 123 -> 12)
-window.fcalcDelete = function() {
+window.fcalcDelete = function () {
     const expr = companionState.calcExpression;
-    if (expr.length > 1) companionState.calcExpression = expr.slice(0, -1);
-    else companionState.calcExpression = '0';
+    companionState.calcExpression = expr.length > 1 ? expr.slice(0, -1) : '0';
     updateFCalcDisplay();
 };
 
-// Equal = Evaluate and record history
-window.fcalcEqual = function() {
+window.fcalcEqual = function () {
     const expr = companionState.calcExpression;
     try {
         const sanitized = expr.replace(/[^0-9+\-*/.]/g, '');
-        // eslint-disable-next-line no-eval
         const result = Function(`'use strict'; return (${sanitized})`)();
-
         if (result === undefined || isNaN(result) || !isFinite(result)) {
             companionState.calcFormula = expr + ' =';
             companionState.calcExpression = 'Error';
         } else {
             const resFormatted = String(Math.round(result * 100000000) / 100000000);
             companionState.calcFormula = expr + ' =';
-
-            // Auto save to history
             companionState.calcHistory.unshift({
                 id: Date.now(),
                 formula: expr.replace(/\*/g, '×').replace(/\//g, '÷'),
@@ -1233,7 +917,6 @@ window.fcalcEqual = function() {
                 timestamp: Date.now()
             });
             localStorage.setItem('pippin_calc_history', JSON.stringify(companionState.calcHistory));
-
             companionState.calcExpression = resFormatted;
             renderCalcHistoryUI();
         }
@@ -1244,35 +927,26 @@ window.fcalcEqual = function() {
 };
 
 function updateFCalcDisplay() {
-    const d = document.getElementById('fcalc-display');
-    const f = document.getElementById('fcalc-formula');
+    const d = getEl('fcalc-display');
+    const f = getEl('fcalc-formula');
     if (d) d.textContent = companionState.calcExpression.replace(/\*/g, '×').replace(/\//g, '÷');
     if (f) f.textContent = companionState.calcFormula || '\u00A0';
 }
 
-window.saveCalculationHistory = function() {
-    localStorage.setItem('pippin_calc_history', JSON.stringify(companionState.calcHistory));
-    alert('History saved.');
-};
-
-window.deleteCalcHistoryItem = function(id) {
+window.deleteCalcHistoryItem = function (id) {
     companionState.calcHistory = companionState.calcHistory.filter(h => h.id !== id);
     localStorage.setItem('pippin_calc_history', JSON.stringify(companionState.calcHistory));
     renderCalcHistoryUI();
 };
 
-window.clearCalculationHistory = function() {
+window.clearCalculationHistory = function () {
     companionState.calcHistory = [];
     localStorage.setItem('pippin_calc_history', JSON.stringify([]));
     renderCalcHistoryUI();
 };
 
-window.discardCalculationHistory = function() {
-    clearCalculationHistory();
-};
-
 function renderCalcHistoryUI() {
-    const list = document.getElementById('fcalc-history-list');
+    const list = getEl('fcalc-history-list');
     if (!list) return;
     list.innerHTML = '';
     if (companionState.calcHistory.length === 0) {
@@ -1291,51 +965,44 @@ function renderCalcHistoryUI() {
 }
 
 // =============================================================================
-// 8. DRAGGING & 8-DIRECTION RESIZING FOR FLOATING COMPANION
+// 8. DRAGGING & 8-DIRECTION RESIZING
 // =============================================================================
 function initCompanionDragging() {
     const companion = document.getElementById('pippin-floating-companion');
     const handle = document.getElementById('companion-drag-handle');
     if (!companion || !handle) return;
-
     let isDragging = false;
     let startX = 0, startY = 0, initialLeft = 0, initialTop = 0;
 
-    handle.addEventListener('pointerdown', (e) => {
+handle.addEventListener('pointerdown', (e) => {
         if (companionState.isLocked) return;
-        if (e.target.closest('button')) return;
-
+        if (e.target.closest('button, input, textarea, select, canvas')) return;
         isDragging = true;
         startX = e.clientX;
         startY = e.clientY;
-
         const rect = companion.getBoundingClientRect();
         initialLeft = rect.left;
         initialTop = rect.top;
-
         companion.style.bottom = 'auto';
         companion.style.right = 'auto';
         companion.style.left = `${initialLeft}px`;
         companion.style.top = `${initialTop}px`;
-
         handle.setPointerCapture(e.pointerId);
     });
 
-    handle.addEventListener('pointermove', (e) => {
+handle.addEventListener('pointermove', (e) => {
         if (!isDragging) return;
         const dx = e.clientX - startX;
         const dy = e.clientY - startY;
-
         companion.style.left = `${Math.max(0, initialLeft + dx)}px`;
         companion.style.top = `${Math.max(0, initialTop + dy)}px`;
     });
 
-    const stopDrag = (e) => {
+const stopDrag = (e) => {
         if (!isDragging) return;
         isDragging = false;
         try { handle.releasePointerCapture(e.pointerId); } catch (_) {}
     };
-
     handle.addEventListener('pointerup', stopDrag);
     handle.addEventListener('pointercancel', stopDrag);
 }
@@ -1344,52 +1011,38 @@ function initCompanion8WayResizing() {
     const companion = document.getElementById('pippin-floating-companion');
     const handles = document.querySelectorAll('.resize-handle');
     if (!companion || !handles.length) return;
+    const MIN_W = 300, MIN_H = 150;
 
-    handles.forEach(h => {
+handles.forEach(h => {
         h.addEventListener('pointerdown', (e) => {
             if (companionState.isLocked) return;
             e.stopPropagation();
             e.preventDefault();
-
             const dir = h.getAttribute('data-dir');
-            const startX = e.clientX;
-            const startY = e.clientY;
-            const startRect = companion.getBoundingClientRect();
-
+            const startX = e.clientX, startY = e.clientY;
+            const r0 = companion.getBoundingClientRect();
             h.setPointerCapture(e.pointerId);
 
-            const onMove = (ev) => {
-                const dx = ev.clientX - startX;
-                const dy = ev.clientY - startY;
-
-                let newW = startRect.width;
-                let newH = startRect.height;
-                let newL = startRect.left;
-                let newT = startRect.top;
-
-                if (dir.includes('e')) newW = Math.max(120, startRect.width + dx);
-                if (dir.includes('s')) newH = Math.max(68, startRect.height + dy);
-                if (dir.includes('w')) {
-                    newW = Math.max(120, startRect.width - dx);
-                    newL = startRect.left + (startRect.width - newW);
-                }
-                if (dir.includes('n')) {
-                    newH = Math.max(68, startRect.height - dy);
-                    newT = startRect.top + (startRect.height - newH);
-                }
-
-                companion.style.width = `${newW}px`;
-                companion.style.height = `${newH}px`;
-                companion.style.left = `${newL}px`;
-                companion.style.top = `${newT}px`;
+const onMove = (ev) => {
+                const dx = ev.clientX - startX, dy = ev.clientY - startY;
+                let w = r0.width, ht = r0.height, l = r0.left, t = r0.top;
+                if (dir.includes('e')) w = Math.max(MIN_W, r0.width + dx);
+                if (dir.includes('s')) ht = Math.max(MIN_H, r0.height + dy);
+                if (dir.includes('w')) { w = Math.max(MIN_W, r0.width - dx); l = r0.left + (r0.width - w); }
+                if (dir.includes('n')) { ht = Math.max(MIN_H, r0.height - dy); t = r0.top + (r0.height - ht); }
+                l = Math.min(Math.max(0, l), window.innerWidth - w);
+                t = Math.min(Math.max(0, t), window.innerHeight - ht);
+                companion.style.width = `${w}px`;
+                companion.style.height = `${ht}px`;
+                companion.style.left = `${l}px`;
+                companion.style.top = `${t}px`;
             };
 
-            const onUp = (ev) => {
+const onUp = (ev) => {
                 try { h.releasePointerCapture(ev.pointerId); } catch (_) {}
                 window.removeEventListener('pointermove', onMove);
                 window.removeEventListener('pointerup', onUp);
             };
-
             window.addEventListener('pointermove', onMove);
             window.addEventListener('pointerup', onUp);
         });
@@ -1397,141 +1050,135 @@ function initCompanion8WayResizing() {
 }
 
 // =============================================================================
-// 9. NATIVE OS ALWAYS-ON-TOP DESKTOP FLOAT (DOCUMENT PICTURE-IN-PICTURE)
+// 9. ALWAYS-ON-TOP DESKTOP FLOAT (DOCUMENT PICTURE-IN-PICTURE)
 // =============================================================================
-window.toggleDesktopFloat = async function() {
+window.toggleDesktopFloat = async function () {
     if (!('documentPictureInPicture' in window)) {
-        alert(
-            'Document Picture-in-Picture is not supported in this browser.\n\n' +
-            'For true Always-On-Top floating over other desktop windows:\n' +
-            '1. Open Pippin in Microsoft Edge or Google Chrome (v116+).\n' +
-            '2. Or run the "Launch-Pippin.bat" desktop shortcut!'
-        );
-        // Fallback: activate in-tab mini mode
-        toggleMiniMode(true);
+        alert('Floating over other apps requires Google Chrome or Microsoft Edge (v116+).\n\nShowing widget in-tab instead.');
+        const c = document.getElementById('pippin-floating-companion');
+        if (c) { c.style.display = 'flex'; companionState.isInTabFallback = true; updateAllTimerDisplays(); }
         return;
     }
-
     try {
-        if (companionState.isPipActive && companionState.pipWindow) {
-            companionState.pipWindow.close();
+        if (companionState.isPipActive && companionState.pipWindow) { companionState.pipWindow.close(); return; }
+        if (companionState.isInTabFallback) {
+            const c = document.getElementById('pippin-floating-companion');
+            if (c) c.style.display = 'none';
+            companionState.isInTabFallback = false;
             return;
         }
-
         const companion = document.getElementById('pippin-floating-companion');
         if (!companion) return;
 
-        // Open live interactive OS window
-        const pipWindow = await window.documentPictureInPicture.requestWindow({
-            width: 440,
-            height: 200
+// 1. Capture compiled inline handlers BEFORE the node moves realms
+        const handlers = new Map();
+        companion.querySelectorAll('[onclick],[onkeydown],[onchange]').forEach(el => {
+            handlers.set(el, { click: el.onclick, keydown: el.onkeydown, change: el.onchange });
         });
 
+// 2. Open the always-on-top window
+        const pipWindow = await window.documentPictureInPicture.requestWindow({ width: 480, height: 240 });
         companionState.pipWindow = pipWindow;
         companionState.isPipActive = true;
 
-        // Copy stylesheets and fonts
-        document.querySelectorAll('link[rel="stylesheet"], style').forEach(el => {
-            pipWindow.document.head.appendChild(el.cloneNode(true));
-        });
-
-        // Inject high-priority PiP reset styling
+// 3. Styles — INCLUDING the hub-open rule so the + menu works in PiP too
+        document.querySelectorAll('link[rel="stylesheet"], style').forEach(el =>
+            pipWindow.document.head.appendChild(el.cloneNode(true)));
         const pipStyle = pipWindow.document.createElement('style');
         pipStyle.textContent = `
-            html, body {
-                margin: 0 !important;
-                padding: 0 !important;
-                width: 100vw !important;
-                height: 100vh !important;
-                overflow: hidden !important;
-                background: #faf6f0 !important;
-            }
-            #pippin-floating-companion {
-                display: flex !important;
-                position: static !important;
-                width: 100vw !important;
-                height: 100vh !important;
-                max-height: 100vh !important;
-                border: none !important;
-                border-radius: 0 !important;
-                box-shadow: none !important;
-                padding: 3px 6px !important;
-                box-sizing: border-box !important;
-            }
-            .resize-handle, #companion-pip-btn {
-                display: none !important;
-            }
+            html, body { margin:0 !important; padding:0 !important; width:100vw !important;
+                height:100vh !important; overflow:hidden !important; background:#faf6f0 !important; }
+            #pippin-floating-companion { display:flex !important; position:static !important;
+                width:100vw !important; height:100vh !important; max-height:100vh !important;
+                border:none !important; border-radius:0 !important; box-shadow:none !important;
+                padding:3px 6px !important; box-sizing:border-box !important; overflow-y:auto !important; }
+            #pippin-floating-companion.hub-open { overflow: visible !important; }
+            .resize-handle, .drag-dots { display:none !important; }
         `;
         pipWindow.document.head.appendChild(pipStyle);
-
-        pipWindow.document.title = 'Pippin Cozy Study Companion (Always on Top)';
+        pipWindow.document.title = 'Pippin Study Companion';
         pipWindow.document.body.className = 'pippin-base-body in-pip-mode';
 
-        // Move live companion into PiP window
-        pipWindow.document.body.appendChild(companion);
+// 4. Delegate clicks/keys/changes back to the MAIN page's functions
+        pipWindow.document.addEventListener('click', (e) => {
+            let el = e.target && e.target.closest ? e.target.closest('[onclick]') : null;
+            while (el) {
+                const h = handlers.get(el);
+                if (h && h.click) { h.click.call(el, e); return; }
+                el = el.parentElement && el.parentElement.closest ? el.parentElement.closest('[onclick]') : null;
+            }
+        });
+        pipWindow.document.addEventListener('keydown', (e) => {
+            const el = e.target && e.target.closest ? e.target.closest('[onkeydown]') : null;
+            const h = el && handlers.get(el);
+            if (h && h.keydown) h.keydown.call(el, e);
+        });
+        pipWindow.document.addEventListener('change', (e) => {
+            const el = e.target && e.target.closest ? e.target.closest('[onchange]') : null;
+            const h = el && handlers.get(el);
+            if (h && h.change) h.change.call(el, e);
+        });
 
-        // When PiP closes, restore to main window
+// 5. Space / Esc inside the PiP window
+        pipWindow.addEventListener('keydown', (e) => {
+            const tag = e.target && e.target.tagName ? e.target.tagName.toLowerCase() : '';
+            const isTyping = tag === 'input' || tag === 'textarea';
+            if (e.code === 'Space' && !isTyping) { e.preventDefault(); toggleTimerRunning(); }
+            if (e.key === 'Escape') {
+                if (companionState.isMultiHubOpen) toggleFloatingMultiHub();
+                else if (companionState.activeTool) closeFloatingSubWindow();
+                else cancelFloatingTimeEdit();
+            }
+        });
+
+// 6. Move the LIVE node (timer + canvas listeners survive), keep it ticking even if main tab is throttled
+        pipWindow.document.body.appendChild(companion);
+        companion.style.display = 'flex';
+        updateAllTimerDisplays();
+        updatePlayButtonUI();
+        updateLiveDateTime();
+        armCompanionIdle();
+        pipWindow.setInterval(() => { if (companionState.isPipActive) updateAllTimerDisplays(); }, 500);
+
+// 7. Restore on close
         pipWindow.addEventListener('pagehide', () => {
             companionState.isPipActive = false;
             companionState.pipWindow = null;
             document.body.appendChild(companion);
-            if (!companionState.isMiniMode) companion.style.display = 'none';
+            companion.style.display = 'none';
         });
-
     } catch (err) {
-        console.error('Failed to open Document Picture-in-Picture window:', err);
+        console.error('Failed to open floating window:', err);
     }
 };
+
 
 // =============================================================================
 // 10. GLOBAL KEYBOARD SHORTCUTS
 // =============================================================================
 function initGlobalShortcuts() {
     window.addEventListener('keydown', (e) => {
+            document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) updateAllTimerDisplays();   // deadline-based: instantly correct
+    });
+
         const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
         const isTyping = activeTag === 'input' || activeTag === 'textarea';
 
-        // Space: Start/Pause Timer (when not typing)
-        if (e.code === 'Space' && !isTyping) {
+if (e.code === 'Space' && !isTyping) {
             e.preventDefault();
-            if (isRunning) pauseTimer();
-            else startTimer();
+            if (isRunning) pauseTimer(); else startTimer();
             return;
         }
 
-        // Ctrl + shortcuts
-        if (e.ctrlKey || e.metaKey) {
+const companionVisible = (companionState.isPipActive || companionState.isInTabFallback);
+        if ((e.ctrlKey || e.metaKey) && companionVisible) {
             const key = e.key.toLowerCase();
-
-            if (key === 'n') {
-                e.preventDefault();
-                toggleMiniMode(true);
-                openFloatingTool('notes');
-            } else if (key === 'l') {
-                e.preventDefault();
-                toggleMiniMode(true);
-                openFloatingTool('lists');
-            } else if (key === 'd') {
-                e.preventDefault();
-                toggleMiniMode(true);
-                openFloatingTool('drawing');
-            } else if (key === 'k') {
-                e.preventDefault();
-                toggleMiniMode(true);
-                openFloatingTool('calculator');
-            } else if (key === 'm') {
-                e.preventDefault();
-                toggleMiniMode(true);
-                toggleFloatingMultiHub();
-            } else if (key === 't') {
-                e.preventDefault();
-                toggleMiniMode(true);
-                enableFloatingTimeEdit();
-            }
+            if (key === 'k') { e.preventDefault(); openFloatingTool('calculator'); }
+            else if (key === 'm') { e.preventDefault(); toggleFloatingMultiHub(); }
         }
 
-        // Esc: close floating tool or MultiHub
-        if (e.key === 'Escape') {
+if (e.key === 'Escape') {
             if (companionState.isMultiHubOpen) toggleFloatingMultiHub();
             else if (companionState.activeTool) closeFloatingSubWindow();
             else cancelFloatingTimeEdit();
@@ -1539,7 +1186,9 @@ function initGlobalShortcuts() {
     });
 }
 
-// Helper: Escape HTML
+// =============================================================================
+// HELPER: Escape HTML (must be the LAST function in the file)
+// =============================================================================
 function escapeHtml(str) {
     if (!str) return '';
     return String(str)

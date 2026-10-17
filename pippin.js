@@ -17,6 +17,8 @@ let initialSeconds = 25 * 60;    // what Reset restores
 let timerInterval = null;
 let timerDeadline = null;        // Date.now()-based -> no drift, no tab-throttle stall
 let isRunning = false;
+let isPause = false;
+let isPauseState = false;
 
 const mascotAssets = ['assets/pippinchill.png', 'assets/pippinnerd.png', 'assets/pippinsad.png', 'assets/pippindawg.png'];
 let currentMascotIndex = 0;
@@ -521,7 +523,10 @@ function updatePlayButtonUI() {
     if (label) label.textContent = isRunning ? 'Pause' : 'Start';
 }
 
-window.toggleTimerRunning = function () { if (isRunning) pauseTimer(); else startTimer(); };
+window.toggleTimerRunning = function () { 
+    if (isRunning) pauseTimer(); 
+    else startTimer(); 
+};
 
 window.startTimer = function () {
     if (isRunning) return;
@@ -1198,3 +1203,13 @@ function escapeHtml(str) {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
 }
+
+// Prevent using an onclick on floating elements cause it bugs out, use an addEventListener instead:
+const companionPlayToggleBtn = document.getElementById("companion-play-toggle-btn");
+const companionResetBtn = document.getElementById("companion-reset-btn");
+companionPlayToggleBtn.addEventListener('click', () => {
+    window.toggleTimerRunning();
+});
+companionResetBtn.addEventListener('click', () => {
+    window.resetTimer();
+});
